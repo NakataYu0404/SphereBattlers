@@ -21,6 +21,9 @@ const float HIT_FEEDBACK_DURATION = 10.0f;
 const int INITIAL_HP = 100;
 const float COLLISION_COOLDOWN_MS = 400.0f;  // 400ms cooldown between hits
 const float MS_PER_FRAME = 16.67f;  // Assuming ~60 FPS
+const int PLAYER_COLLISION_DAMAGE = 5;  // Damage from player-player collision
+const int WEAPON_DAMAGE = 13;  // Damage from weapon hits
+const float WEAPON_COLLISION_THRESHOLD = 5.0f;  // Distance threshold for weapon-weapon collision
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
@@ -211,7 +214,7 @@ bool CheckWeaponWeaponCollision(const Circle& player1, const Circle& player2) {
     minDist = (minDist < dist4) ? minDist : dist4;
     
     // Weapons collide if segments are very close
-    return minDist < 5.0f;
+    return minDist < WEAPON_COLLISION_THRESHOLD;
 }
 
 // Check and handle circle-circle collision
@@ -256,12 +259,12 @@ void HandlePlayerCollision(Circle& c1, Circle& c2, CollisionCooldown& cooldown) 
         if (cooldown.playerPlayerCooldown <= 0.0f && cooldown.playerPlayerSeparated) {
             // Both players take damage from collision
             if (c1.hp > 0) {
-                c1.hp -= 5;  // Small collision damage
+                c1.hp -= PLAYER_COLLISION_DAMAGE;
                 if (c1.hp < 0) c1.hp = 0;
                 c1.hitTimer = HIT_FEEDBACK_DURATION;
             }
             if (c2.hp > 0) {
-                c2.hp -= 5;  // Small collision damage
+                c2.hp -= PLAYER_COLLISION_DAMAGE;
                 if (c2.hp < 0) c2.hp = 0;
                 c2.hitTimer = HIT_FEEDBACK_DURATION;
             }
@@ -414,7 +417,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
             
             if (weapon0HitsPlayer1 && cooldown.weapon0ToPlayer1Cooldown <= 0.0f && cooldown.weapon0Player1Separated) {
-                circles[1].hp -= 13;  // Weapon damage
+                circles[1].hp -= WEAPON_DAMAGE;
                 if (circles[1].hp < 0) circles[1].hp = 0;
                 circles[1].hitTimer = HIT_FEEDBACK_DURATION;
                 cooldown.weapon0ToPlayer1Cooldown = COLLISION_COOLDOWN_MS;
@@ -429,7 +432,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
             
             if (weapon1HitsPlayer0 && cooldown.weapon1ToPlayer0Cooldown <= 0.0f && cooldown.weapon1Player0Separated) {
-                circles[0].hp -= 13;  // Weapon damage
+                circles[0].hp -= WEAPON_DAMAGE;
                 if (circles[0].hp < 0) circles[0].hp = 0;
                 circles[0].hitTimer = HIT_FEEDBACK_DURATION;
                 cooldown.weapon1ToPlayer0Cooldown = COLLISION_COOLDOWN_MS;
