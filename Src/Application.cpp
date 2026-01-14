@@ -1,20 +1,16 @@
 #include <DxLib.h>
-#include <EffekseerForDXLib.h>
 #include "Manager/InputManager.h"
 #include "Manager/ResourceManager.h"
-#include "Manager/Timer.h"
-#include "Manager/SceneManager.h"
-#include "Object/Common/CollisionManager.h"
-#include "Object/Stage/Stage.h"
+#include "../Tool/HitboxTool.h"
 #include "Application.h"
 
 Application* Application::instance_ = nullptr;
 
 const std::string Application::PATH_IMAGE = "Data/Image/";
 const std::string Application::PATH_MODEL = "Data/Model/";
-const std::string Application::PATH_EFFECT = "Data/Effect/";
-const std::string Application::PATH_SOUND = "Data/Sound/";
 const std::string Application::PATH_SHADER = "Data/Shader/";
+const std::string Application::PATH_SOUND = "Data/Sound/";
+const std::string Application::PATH_JSON = "Data/JSON/";
 
 void Application::CreateInstance(void)
 {
@@ -32,16 +28,12 @@ Application& Application::GetInstance(void)
 
 void Application::Init(void)
 {
-	/////aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
-	//	アプリケーションの初期設定
-	SetWindowText("Contest");
+	SetWindowText("HitboxTool");
 
-	//	ウィンドウサイズ
-	SetGraphMode(SCREEN_SIZE_X, SCREEN_SIZE_Y, 32);
+	SetGraphMode(SCREEN_SIZE_X, SCREEN_SIZE_Y, INIT_COLORBIT);
 	ChangeWindowMode(true);
 
-	//	DxLibの初期化
 	SetUseDirect3DVersion(DX_DIRECT3D_11);
 	isInitFail_ = false;
 	if (DxLib_Init() == -1)
@@ -50,23 +42,17 @@ void Application::Init(void)
 		return;
 	}
 
-	//	Effekseerの初期化
-	InitEffekseer();
+	//AddMenuItem_Name(NULL, "MENU");
+	//AddMenuItem_Name("MENU", "QUIT");
+	//SetUseMenuFlag(TRUE);
 
-	//	キー制御初期化
 	SetUseDirectInputFlag(true);
 	InputManager::CreateInstance();
-
-	//	リソース管理初期化
 	ResourceManager::CreateInstance();
 
-	CollisionManager::CreateInstance();
+	HitboxTool::CreateInstance();
 
-	//タイマー管理初期化
-	Timer::CreateInstance();
-
-	//	シーン管理初期化
-	SceneManager::CreateInstance();
+	//SceneManager::CreateInstance();
 
 	std::random_device rd;
 	gen_ = std::mt19937(rd());
@@ -75,46 +61,46 @@ void Application::Init(void)
 
 void Application::Run(void)
 {
-
 	auto& inputManager = InputManager::GetInstance();
-	auto& sceneManager = SceneManager::GetInstance();
-	auto& timer = Timer::GetInstance();
+	//auto& sceneManager = SceneManager::GetInstance();
+	auto& hitboxTool = HitboxTool::GetInstance();
 
-	//	ゲームループ
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0)
 	{
+	auto start = std::chrono::high_resolution_clock::now();
 
-		inputManager.Update();
-		timer.Update();
-		sceneManager.Update();
+		inputManager.Update(false);
 
-		sceneManager.Draw();
+		hitboxTool.Update();
 
+		ClsDrawScreen();
+		hitboxTool.Draw();
 		ScreenFlip();
+		//sceneManager.Update();
 
+		//sceneManager.Draw();
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		std::cout << "Frame time: " << duration.count() << " ms\n";
 	}
-
 }
 
 void Application::Destroy(void)
 {
-	InputManager::GetInstance().Destroy();
 	ResourceManager::GetInstance().Destroy();
-	SceneManager::GetInstance().Destroy();
-	Timer::GetInstance().Destroy();
-	CollisionManager::GetInstance().Destroy();
+	//SceneManager::GetInstance().Destroy();
+	//CollisionManager::GetInstance().Destroy();
+	InputManager::GetInstance().Destroy();
+	//UIManager::GetInstance().Destroy();
 
-	//	Effekseerを終了する。
-	Effkseer_End();
+	//Effkseer_End();
 
-	//	DxLib終了
 	if (DxLib_End() == -1)
 	{
 		isReleaseFail_ = true;
 	}
 
 	delete instance_;
-
 }
 
 bool Application::IsInitFail(void) const
@@ -135,19 +121,6 @@ int Application::GetRandomNum(int max)
 }
 
 Application::Application(void)
+	: isInitFail_(false), isReleaseFail_(false)
 {
-	isInitFail_ = false;
-	isReleaseFail_ = false;
-}
-
-void Application::InitEffekseer(void)
-{
-	if (Effekseer_Init(8000) == -1)
-	{
-		DxLib_End();
-	}
-
-	SetChangeScreenModeGraphicsSystemResetFlag(FALSE);
-
-	Effekseer_SetGraphicsDeviceLostCallbackFunctions();
 }

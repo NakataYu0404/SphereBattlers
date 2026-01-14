@@ -75,11 +75,18 @@ public:
 
 	//	２つのベクトル間の回転量を取得する
 	static Quaternion FromToRotation(VECTOR fromDir, VECTOR toDir);
+
+	//	A→Bに入力した時間で向くQuaternionを取得
 	static Quaternion RotateTowards(const Quaternion& from, const Quaternion& to, float maxDegreesDelta);
+
+	//	ラジアン角
 	static double Angle(const Quaternion& q1, const Quaternion& q2);
+	
+	//	clampせずに回転
 	static Quaternion SlerpUnclamped(Quaternion a, Quaternion b, float t);
 	static Quaternion Identity(void);
 
+	//	距離を取得
 	double Length(void) const;
 	double LengthSquared(void) const;
 	VECTOR xyz(void) const;

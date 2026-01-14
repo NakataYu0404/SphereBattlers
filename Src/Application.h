@@ -2,12 +2,12 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <windows.h>
+#include "Utility/Utility.h"
 
 class Application
 {
-
 public:
-
 	//	スクリーンサイズ
 	static constexpr int SCREEN_SIZE_X = 1600;
 	static constexpr int SCREEN_SIZE_Y = 900;
@@ -16,12 +16,12 @@ public:
 	//	-------------------------------------------
 	static const std::string PATH_IMAGE;
 	static const std::string PATH_MODEL;
-	static const std::string PATH_EFFECT;
-	static const std::string PATH_SOUND;
 	static const std::string PATH_SHADER;
+	static const std::string PATH_SOUND;
+	static const std::string PATH_JSON;
 	//	-------------------------------------------
 
-	//	明示的にインステンスを生成する
+	//	明示的にインスタンスを生成する
 	static void CreateInstance(void);
 
 	//	静的インスタンスの取得
@@ -45,14 +45,12 @@ public:
 	int GetRandomNum(int max);
 private:
 
-	//	デフォルトコンストラクタをprivateにして、
-	//	外部から生成できない様にする
+	static constexpr int INIT_COLORBIT = 32;
+
+	//	デフォルトコンストラクタをprivateにして、外部から生成できない様にする
 	Application(void);
 	Application(const Application& manager) = default;
 	~Application(void) = default;
-
-	//	Effekseerの初期化
-	void InitEffekseer(void);
 
 	//	静的インスタンス
 	static Application* instance_;
@@ -63,6 +61,8 @@ private:
 	//	解放失敗
 	bool isReleaseFail_;
 
-	std::mt19937 gen_;
+	//	ウィンドウハンドル
+	HWND hWnd;
 
+	std::mt19937 gen_;
 };

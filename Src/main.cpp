@@ -27,7 +27,6 @@ const float HIT_COOLDOWN_DURATION = 24.0f;  // ~0.4s at 60fps (frames) - cooldow
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
-const int TITLE_X_OFFSET = -100;
 const int TITLE_Y_POSITION = 30;
 const int STATS_Y_OFFSET = 30;
 const int STATS_RIGHT_X_OFFSET = -150;
