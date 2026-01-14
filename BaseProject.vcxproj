@@ -19,64 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Src\Object\Player\PlayerNakata.cpp" />
-    <ClCompile Include="Src\Object\Stage\MagmaEffects.cpp" />
-    <ClCompile Include="Src\Application.cpp" />
-    <ClCompile Include="Src\Common\Easing.cpp" />
-    <ClCompile Include="Src\Common\Fader.cpp" />
-    <ClCompile Include="Src\Common\Quaternion.cpp" />
-    <ClCompile Include="Src\Manager\Timer.cpp" />
-    <ClCompile Include="Src\Common\Vector2.cpp" />
     <ClCompile Include="Src\main.cpp" />
-    <ClCompile Include="Src\Manager\Camera.cpp" />
-    <ClCompile Include="Src\Manager\InputManager.cpp" />
-    <ClCompile Include="Src\Manager\Resource.cpp" />
-    <ClCompile Include="Src\Manager\ResourceManager.cpp" />
-    <ClCompile Include="Src\Manager\SceneManager.cpp" />
-    <ClCompile Include="Src\Object\ActorBase.cpp" />
-    <ClCompile Include="Src\Object\Common\AnimationController.cpp" />
-    <ClCompile Include="Src\Object\Common\Capsule.cpp" />
-    <ClCompile Include="Src\Object\Common\Collider.cpp" />
-    <ClCompile Include="Src\Object\Common\CollisionManager.cpp" />
-    <ClCompile Include="Src\Object\Common\EffectController.cpp" />
-    <ClCompile Include="Src\Object\Common\Sphere.cpp" />
-    <ClCompile Include="Src\Object\Common\Transform.cpp" />
-    <ClCompile Include="Src\Object\Stage\Magma.cpp" />
-    <ClCompile Include="Src\Scene\GameScene.cpp" />
-    <ClCompile Include="Src\Scene\SceneBase.cpp" />
-    <ClCompile Include="Src\Scene\TitleScene.cpp" />
-    <ClCompile Include="Src\Utility\AsoUtility.cpp" />
-    <ClCompile Include="Src\Object\Stage\Stage.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Src\Object\Player\PlayerNakata.h" />
-    <ClInclude Include="Src\Object\Stage\MagmaEffects.h" />
-    <ClInclude Include="Src\Application.h" />
-    <ClInclude Include="Src\Common\Easing.h" />
-    <ClInclude Include="Src\Common\Fader.h" />
-    <ClInclude Include="Src\Common\Quaternion.h" />
-    <ClInclude Include="Src\Manager\Timer.h" />
-    <ClInclude Include="Src\Common\Vector2.h" />
-    <ClInclude Include="Src\main.h" />
-    <ClInclude Include="Src\Manager\Camera.h" />
-    <ClInclude Include="Src\Manager\InputManager.h" />
-    <ClInclude Include="Src\Manager\Resource.h" />
-    <ClInclude Include="Src\Manager\ResourceManager.h" />
-    <ClInclude Include="Src\Manager\SceneManager.h" />
-    <ClInclude Include="Src\Object\ActorBase.h" />
-    <ClInclude Include="Src\Object\Common\AnimationController.h" />
-    <ClInclude Include="Src\Object\Common\Capsule.h" />
-    <ClInclude Include="Src\Object\Common\Collider.h" />
-    <ClInclude Include="Src\Object\Common\CollisionManager.h" />
-    <ClInclude Include="Src\Object\Common\EffectController.h" />
-    <ClInclude Include="Src\Object\Common\Sphere.h" />
-    <ClInclude Include="Src\Object\Common\Transform.h" />
-    <ClInclude Include="Src\Object\Stage\Magma.h" />
-    <ClInclude Include="Src\Scene\GameScene.h" />
-    <ClInclude Include="Src\Scene\SceneBase.h" />
-    <ClInclude Include="Src\Scene\TitleScene.h" />
-    <ClInclude Include="Src\Utility\AsoUtility.h" />
-    <ClInclude Include="Src\Object\Stage\Stage.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
