@@ -20,12 +20,13 @@ const unsigned int COLOR_HIT_FEEDBACK = 0xFF6666;
 const float HIT_FEEDBACK_DURATION = 10.0f;
 const int MAX_HP = 100;
 const int WEAPON_DAMAGE = 10;
-const float HIT_STOP_DURATION = 10.0f;  // ~100ms at 60fps (frames)
+const float HIT_STOP_DURATION = 20.0f;  // ~100ms at 60fps (frames)
 const float WEAPON_COLLISION_THRESHOLD = 5.0f;  // Distance threshold for weapon-weapon collision
 const float WEAPON_BOUNCE_DAMPING = 0.8f;  // Damping factor for weapon bounce
 const float HIT_COOLDOWN_DURATION = 24.0f;  // ~0.4s at 60fps (frames) - cooldown between hits
 
 // Text positioning constants
+const int TITLE_X_OFFSET = -100;
 const int TITLE_X_OFFSET = -100;
 const int TITLE_Y_POSITION = 30;
 const int STATS_Y_OFFSET = 30;
@@ -372,9 +373,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
             
             // Handle player-player collision (only if both alive)
+           
             if (circles[0].isAlive && circles[1].isAlive) {
                 if (HandlePlayerCollision(circles[0], circles[1])) {
-                    hitStopTimer = HIT_STOP_DURATION;
+                    
+                    // やっぱプレイヤー同士の場合はヒットストップいらんかな。一旦コメント分にしておく
+                    // hitStopTimer = HIT_STOP_DURATION;
                 }
             }
             
@@ -478,11 +482,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         
         // Draw title text at top
-        DrawFormatString(SCREEN_WIDTH / 2 + TITLE_X_OFFSET, TITLE_Y_POSITION, COLOR_BLACK, "Boomerang VS Spear");
+        DrawFormatString(SCREEN_WIDTH / 2 + TITLE_X_OFFSET, TITLE_Y_POSITION, COLOR_BLACK, "");
         
         // Draw stats at bottom
-        DrawFormatString(FRAME_LEFT, FRAME_BOTTOM + STATS_Y_OFFSET, COLOR_YELLOW, "Throw Damage: 13");
-        DrawFormatString(FRAME_RIGHT + STATS_RIGHT_X_OFFSET, FRAME_BOTTOM + STATS_Y_OFFSET, COLOR_CYAN, "Damage/Length: 3.5");
+        DrawFormatString(FRAME_LEFT, FRAME_BOTTOM + STATS_Y_OFFSET, COLOR_YELLOW, "Throw Damage: ");
+        DrawFormatString(FRAME_RIGHT + STATS_RIGHT_X_OFFSET, FRAME_BOTTOM + STATS_Y_OFFSET, COLOR_CYAN, "Damage/Length:");
         
         ScreenFlip();
     }
