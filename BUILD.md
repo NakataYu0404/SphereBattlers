@@ -31,8 +31,9 @@ This is a simple 2D DxLib demo showing an autoplay animation with bouncing circl
 - **Cyan Circle**: Number 91, bounces inside the frame with rotating spear
 - **Weapon Possession**: Each player holds its weapon at a defined offset that rotates with the player
   - Weapons orbit around players as they spin
-  - Yellow boomerang orbits at 40 pixels offset, rotating at its own speed
-  - Cyan spear orbits at 45 pixels offset, rotating at its own speed
+  - Yellow boomerang orbits at 40 pixels offset, following player's rotation
+  - Cyan spear orbits at 45 pixels offset, following player's rotation
+  - Weapons rotate solely with their owning player's angle (no independent spin)
 - **Collision Detection**:
   - Player-player: Circle-circle collision with elastic bounce
   - Weapon-player: Line segment vs circle collision detection

@@ -40,8 +40,6 @@ struct WeaponDef {
     float offsetY;      // Local offset Y
     float length;       // Length for collision detection
     unsigned int color;
-    float weaponAngle;  // Weapon's own rotation angle
-    float weaponRotSpeed; // Weapon's own rotation speed
 };
 
 // Circle/Player struct
@@ -145,8 +143,8 @@ bool CheckWeaponHit(const Circle& attacker, const Circle& target) {
     float weaponWorldX, weaponWorldY;
     GetWeaponWorldPosition(attacker, weaponWorldX, weaponWorldY);
     
-    // Weapon line segment endpoints
-    float weaponAngle = attacker.weapon.weaponAngle;
+    // Weapon line segment endpoints (using player's angle)
+    float weaponAngle = attacker.angle;
     float cos_w = cosf(weaponAngle);
     float sin_w = sinf(weaponAngle);
     float halfLen = attacker.weapon.length * 0.5f;
@@ -226,8 +224,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     circles[0].weapon.offsetY = 0.0f;
     circles[0].weapon.length = 25.0f;   // For collision
     circles[0].weapon.color = COLOR_YELLOW;
-    circles[0].weapon.weaponAngle = 0.0f;
-    circles[0].weapon.weaponRotSpeed = 0.05f;
     
     // Cyan circle (91) with spear
     circles[1].x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
@@ -244,8 +240,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     circles[1].weapon.offsetY = 0.0f;
     circles[1].weapon.length = 30.0f;   // For collision
     circles[1].weapon.color = COLOR_CYAN;
-    circles[1].weapon.weaponAngle = 0.0f;
-    circles[1].weapon.weaponRotSpeed = 0.04f;
     
     // Main loop
     while (ProcessMessage() == 0) {
@@ -269,9 +263,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             // Update rotation
             circles[i].angle += circles[i].angularVel;
-            
-            // Update weapon rotation
-            circles[i].weapon.weaponAngle += circles[i].weapon.weaponRotSpeed;
             
             // Update hit timer
             if (circles[i].hitTimer > 0.0f) {
@@ -331,11 +322,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             float weaponWorldX, weaponWorldY;
             GetWeaponWorldPosition(circles[i], weaponWorldX, weaponWorldY);
             
-            // Draw weapon
+            // Draw weapon using player's angle
             if (circles[i].weapon.type == WEAPON_BOOMERANG) {
-                DrawBoomerang(weaponWorldX, weaponWorldY, circles[i].weapon.weaponAngle, circles[i].weapon.color);
+                DrawBoomerang(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.color);
             } else {
-                DrawSpear(weaponWorldX, weaponWorldY, circles[i].weapon.weaponAngle, circles[i].weapon.color);
+                DrawSpear(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.color);
             }
         }
         
