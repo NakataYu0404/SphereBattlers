@@ -18,6 +18,9 @@ const unsigned int COLOR_CYAN = 0x00FFFF;
 const unsigned int COLOR_BLACK = 0x000000;
 const unsigned int COLOR_HIT_FEEDBACK = 0xFF6666;
 const float HIT_FEEDBACK_DURATION = 10.0f;
+const int INITIAL_HP = 100;
+const float COLLISION_COOLDOWN_MS = 400.0f;  // 400ms cooldown between hits
+const float MS_PER_FRAME = 16.67f;  // Assuming ~60 FPS
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
@@ -42,6 +45,18 @@ struct WeaponDef {
     unsigned int color;
 };
 
+// Cooldown tracking structure
+struct CollisionCooldown {
+    float playerPlayerCooldown;
+    float weapon0ToPlayer1Cooldown;
+    float weapon1ToPlayer0Cooldown;
+    float weaponWeaponCooldown;
+    bool playerPlayerSeparated;
+    bool weapon0Player1Separated;
+    bool weapon1Player0Separated;
+    bool weaponWeaponSeparated;
+};
+
 // Circle/Player struct
 struct Circle {
     float x, y;         // Position
@@ -52,6 +67,7 @@ struct Circle {
     unsigned int color;
     WeaponDef weapon;
     float hitTimer;     // Timer for hit feedback (counts down)
+    int hp;             // Current HP
 };
 
 // Function to draw a boomerang
@@ -159,14 +175,60 @@ bool CheckWeaponHit(const Circle& attacker, const Circle& target) {
     return dist < CIRCLE_RADIUS;
 }
 
+// Check if two weapons collide (line segment vs line segment)
+bool CheckWeaponWeaponCollision(const Circle& player1, const Circle& player2) {
+    // Get both weapon world positions
+    float weapon1X, weapon1Y, weapon2X, weapon2Y;
+    GetWeaponWorldPosition(player1, weapon1X, weapon1Y);
+    GetWeaponWorldPosition(player2, weapon2X, weapon2Y);
+    
+    // Weapon 1 line segment
+    float cos_w1 = cosf(player1.angle);
+    float sin_w1 = sinf(player1.angle);
+    float halfLen1 = player1.weapon.length * 0.5f;
+    float x1a = weapon1X - cos_w1 * halfLen1;
+    float y1a = weapon1Y - sin_w1 * halfLen1;
+    float x1b = weapon1X + cos_w1 * halfLen1;
+    float y1b = weapon1Y + sin_w1 * halfLen1;
+    
+    // Weapon 2 line segment
+    float cos_w2 = cosf(player2.angle);
+    float sin_w2 = sinf(player2.angle);
+    float halfLen2 = player2.weapon.length * 0.5f;
+    float x2a = weapon2X - cos_w2 * halfLen2;
+    float y2a = weapon2Y - sin_w2 * halfLen2;
+    float x2b = weapon2X + cos_w2 * halfLen2;
+    float y2b = weapon2Y + sin_w2 * halfLen2;
+    
+    // Check distance between line segments (approximate with endpoints)
+    float dist1 = DistancePointToSegment(x1a, y1a, x2a, y2a, x2b, y2b);
+    float dist2 = DistancePointToSegment(x1b, y1b, x2a, y2a, x2b, y2b);
+    float dist3 = DistancePointToSegment(x2a, y2a, x1a, y1a, x1b, y1b);
+    float dist4 = DistancePointToSegment(x2b, y2b, x1a, y1a, x1b, y1b);
+    
+    float minDist = (dist1 < dist2) ? dist1 : dist2;
+    minDist = (minDist < dist3) ? minDist : dist3;
+    minDist = (minDist < dist4) ? minDist : dist4;
+    
+    // Weapons collide if segments are very close
+    return minDist < 5.0f;
+}
+
 // Check and handle circle-circle collision
-void HandlePlayerCollision(Circle& c1, Circle& c2) {
+void HandlePlayerCollision(Circle& c1, Circle& c2, CollisionCooldown& cooldown) {
     float dx = c2.x - c1.x;
     float dy = c2.y - c1.y;
     float distSq = dx * dx + dy * dy;
     float minDist = CIRCLE_RADIUS * 2.0f;
     
-    if (distSq < minDist * minDist && distSq > 0.001f) {
+    bool colliding = distSq < minDist * minDist && distSq > 0.001f;
+    
+    if (!colliding) {
+        // Not colliding - mark as separated
+        cooldown.playerPlayerSeparated = true;
+    }
+    
+    if (colliding) {
         // Collision detected - elastic bounce
         float dist = sqrtf(distSq);
         
@@ -189,6 +251,23 @@ void HandlePlayerCollision(Circle& c1, Circle& c2) {
         c1.vy += (v2n - v1n) * dy;
         c2.vx += (v1n - v2n) * dx;
         c2.vy += (v1n - v2n) * dy;
+        
+        // Apply damage if cooldown expired and separated since last hit
+        if (cooldown.playerPlayerCooldown <= 0.0f && cooldown.playerPlayerSeparated) {
+            // Both players take damage from collision
+            if (c1.hp > 0) {
+                c1.hp -= 5;  // Small collision damage
+                if (c1.hp < 0) c1.hp = 0;
+                c1.hitTimer = HIT_FEEDBACK_DURATION;
+            }
+            if (c2.hp > 0) {
+                c2.hp -= 5;  // Small collision damage
+                if (c2.hp < 0) c2.hp = 0;
+                c2.hitTimer = HIT_FEEDBACK_DURATION;
+            }
+            cooldown.playerPlayerCooldown = COLLISION_COOLDOWN_MS;
+            cooldown.playerPlayerSeparated = false;
+        }
     }
 }
 
@@ -219,6 +298,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     circles[0].number = 92;
     circles[0].color = COLOR_YELLOW;
     circles[0].hitTimer = 0.0f;
+    circles[0].hp = INITIAL_HP;
     circles[0].weapon.type = WEAPON_BOOMERANG;
     circles[0].weapon.offsetX = 40.0f;  // Offset in local space
     circles[0].weapon.offsetY = 0.0f;
@@ -235,11 +315,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     circles[1].number = 91;
     circles[1].color = COLOR_CYAN;
     circles[1].hitTimer = 0.0f;
+    circles[1].hp = INITIAL_HP;
     circles[1].weapon.type = WEAPON_SPEAR;
     circles[1].weapon.offsetX = 45.0f;  // Offset in local space
     circles[1].weapon.offsetY = 0.0f;
     circles[1].weapon.length = 30.0f;   // For collision
     circles[1].weapon.color = COLOR_CYAN;
+    
+    // Initialize cooldown tracking
+    CollisionCooldown cooldown;
+    cooldown.playerPlayerCooldown = 0.0f;
+    cooldown.weapon0ToPlayer1Cooldown = 0.0f;
+    cooldown.weapon1ToPlayer0Cooldown = 0.0f;
+    cooldown.weaponWeaponCooldown = 0.0f;
+    cooldown.playerPlayerSeparated = true;
+    cooldown.weapon0Player1Separated = true;
+    cooldown.weapon1Player0Separated = true;
+    cooldown.weaponWeaponSeparated = true;
     
     // Main loop
     while (ProcessMessage() == 0) {
@@ -257,6 +349,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         
         // Update and draw circles
         for (int i = 0; i < 2; i++) {
+            // Skip update if K.O. (HP = 0)
+            if (circles[i].hp <= 0) {
+                continue;
+            }
+            
             // Update position
             circles[i].x += circles[i].vx;
             circles[i].y += circles[i].vy;
@@ -288,19 +385,80 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
         }
         
-        // Handle player-player collision
-        HandlePlayerCollision(circles[0], circles[1]);
+        // Update cooldown timers
+        if (cooldown.playerPlayerCooldown > 0.0f) {
+            cooldown.playerPlayerCooldown -= MS_PER_FRAME;
+        }
+        if (cooldown.weapon0ToPlayer1Cooldown > 0.0f) {
+            cooldown.weapon0ToPlayer1Cooldown -= MS_PER_FRAME;
+        }
+        if (cooldown.weapon1ToPlayer0Cooldown > 0.0f) {
+            cooldown.weapon1ToPlayer0Cooldown -= MS_PER_FRAME;
+        }
+        if (cooldown.weaponWeaponCooldown > 0.0f) {
+            cooldown.weaponWeaponCooldown -= MS_PER_FRAME;
+        }
+        
+        // Handle player-player collision (only if both alive)
+        if (circles[0].hp > 0 && circles[1].hp > 0) {
+            HandlePlayerCollision(circles[0], circles[1], cooldown);
+        }
         
         // Check weapon hits
-        if (CheckWeaponHit(circles[0], circles[1])) {
-            circles[1].hitTimer = HIT_FEEDBACK_DURATION;
-        }
-        if (CheckWeaponHit(circles[1], circles[0])) {
-            circles[0].hitTimer = HIT_FEEDBACK_DURATION;
+        if (circles[0].hp > 0 && circles[1].hp > 0) {
+            // Check if weapon 0 hits player 1
+            bool weapon0HitsPlayer1 = CheckWeaponHit(circles[0], circles[1]);
+            
+            if (!weapon0HitsPlayer1) {
+                cooldown.weapon0Player1Separated = true;
+            }
+            
+            if (weapon0HitsPlayer1 && cooldown.weapon0ToPlayer1Cooldown <= 0.0f && cooldown.weapon0Player1Separated) {
+                circles[1].hp -= 13;  // Weapon damage
+                if (circles[1].hp < 0) circles[1].hp = 0;
+                circles[1].hitTimer = HIT_FEEDBACK_DURATION;
+                cooldown.weapon0ToPlayer1Cooldown = COLLISION_COOLDOWN_MS;
+                cooldown.weapon0Player1Separated = false;
+            }
+            
+            // Check if weapon 1 hits player 0
+            bool weapon1HitsPlayer0 = CheckWeaponHit(circles[1], circles[0]);
+            
+            if (!weapon1HitsPlayer0) {
+                cooldown.weapon1Player0Separated = true;
+            }
+            
+            if (weapon1HitsPlayer0 && cooldown.weapon1ToPlayer0Cooldown <= 0.0f && cooldown.weapon1Player0Separated) {
+                circles[0].hp -= 13;  // Weapon damage
+                if (circles[0].hp < 0) circles[0].hp = 0;
+                circles[0].hitTimer = HIT_FEEDBACK_DURATION;
+                cooldown.weapon1ToPlayer0Cooldown = COLLISION_COOLDOWN_MS;
+                cooldown.weapon1Player0Separated = false;
+            }
+            
+            // Check weapon-weapon collision
+            bool weaponsCollide = CheckWeaponWeaponCollision(circles[0], circles[1]);
+            
+            if (!weaponsCollide) {
+                cooldown.weaponWeaponSeparated = true;
+            }
+            
+            if (weaponsCollide && cooldown.weaponWeaponCooldown <= 0.0f && cooldown.weaponWeaponSeparated) {
+                // Both weapons take "damage" (visual feedback)
+                circles[0].hitTimer = HIT_FEEDBACK_DURATION;
+                circles[1].hitTimer = HIT_FEEDBACK_DURATION;
+                cooldown.weaponWeaponCooldown = COLLISION_COOLDOWN_MS;
+                cooldown.weaponWeaponSeparated = false;
+            }
         }
         
         // Draw circles with hit feedback
         for (int i = 0; i < 2; i++) {
+            // Skip drawing if K.O. (HP = 0)
+            if (circles[i].hp <= 0) {
+                continue;
+            }
+            
             unsigned int drawColor = circles[i].color;
             
             // Apply red flash if hit
@@ -312,12 +470,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, drawColor, TRUE);
             DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, COLOR_BLACK, FALSE);
             
-            // Draw number on circle
-            DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].number);
+            // Draw HP as the number on circle
+            DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].hp);
         }
         
         // Draw weapons at player positions with rotated offsets
         for (int i = 0; i < 2; i++) {
+            // Skip drawing weapon if player is K.O.
+            if (circles[i].hp <= 0) {
+                continue;
+            }
+            
             // Calculate weapon world position
             float weaponWorldX, weaponWorldY;
             GetWeaponWorldPosition(circles[i], weaponWorldX, weaponWorldY);
