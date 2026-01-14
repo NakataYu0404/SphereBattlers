@@ -32,8 +32,6 @@ const int STATS_Y_OFFSET = 30;
 const int STATS_RIGHT_X_OFFSET = -150;
 const int CIRCLE_NUMBER_X_OFFSET = -10;
 const int CIRCLE_NUMBER_Y_OFFSET = -8;
-const int HP_TEXT_X_OFFSET = -15;
-const int HP_TEXT_Y_OFFSET = -45;
 const int KO_TEXT_X_OFFSET = -20;
 const int KO_TEXT_Y_OFFSET = -10;
 
