@@ -25,19 +25,33 @@ const int STATS_RIGHT_X_OFFSET = -150;
 const int CIRCLE_NUMBER_X_OFFSET = -10;
 const int CIRCLE_NUMBER_Y_OFFSET = -8;
 
-// Circle struct
-struct Circle {
-    float x, y;
-    float vx, vy;
-    int number;
-    unsigned int color;
+// Weapon type enum
+enum WeaponType {
+    WEAPON_BOOMERANG,
+    WEAPON_SPEAR
 };
 
-// Weapon struct
-struct Weapon {
-    float x, y;
-    float angle;
-    float rotationSpeed;
+// Weapon definition (attached to player)
+struct WeaponDef {
+    WeaponType type;
+    float offsetX;      // Local offset X (in player's local space)
+    float offsetY;      // Local offset Y
+    float length;       // Length for collision detection
+    unsigned int color;
+    float weaponAngle;  // Weapon's own rotation angle
+    float weaponRotSpeed; // Weapon's own rotation speed
+};
+
+// Circle/Player struct
+struct Circle {
+    float x, y;         // Position
+    float vx, vy;       // Velocity
+    float angle;        // Player rotation angle
+    float angularVel;   // Angular velocity
+    int number;
+    unsigned int color;
+    WeaponDef weapon;
+    float hitTimer;     // Timer for hit feedback (counts down)
 };
 
 // Function to draw a boomerang
@@ -89,6 +103,90 @@ void DrawSpear(float x, float y, float angle, unsigned int color) {
     DrawTriangleAA(tipX, tipY, baseX1, baseY1, baseX2, baseY2, color, TRUE);
 }
 
+// Helper function: Calculate distance from point to line segment
+float DistancePointToSegment(float px, float py, float x1, float y1, float x2, float y2) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float lengthSq = dx * dx + dy * dy;
+    
+    if (lengthSq < 0.001f) {
+        // Degenerate segment
+        dx = px - x1;
+        dy = py - y1;
+        return sqrtf(dx * dx + dy * dy);
+    }
+    
+    // Project point onto line
+    float t = ((px - x1) * dx + (py - y1) * dy) / lengthSq;
+    t = (t < 0.0f) ? 0.0f : ((t > 1.0f) ? 1.0f : t);
+    
+    float closestX = x1 + t * dx;
+    float closestY = y1 + t * dy;
+    
+    dx = px - closestX;
+    dy = py - closestY;
+    return sqrtf(dx * dx + dy * dy);
+}
+
+// Check if weapon hits a player (line segment vs circle)
+bool CheckWeaponHit(const Circle& attacker, const Circle& target) {
+    // Get weapon world position
+    float cos_player = cosf(attacker.angle);
+    float sin_player = sinf(attacker.angle);
+    
+    // Rotate offset to world space
+    float weaponWorldX = attacker.x + (cos_player * attacker.weapon.offsetX - sin_player * attacker.weapon.offsetY);
+    float weaponWorldY = attacker.y + (sin_player * attacker.weapon.offsetX + cos_player * attacker.weapon.offsetY);
+    
+    // Weapon line segment endpoints
+    float weaponAngle = attacker.weapon.weaponAngle;
+    float cos_w = cosf(weaponAngle);
+    float sin_w = sinf(weaponAngle);
+    float halfLen = attacker.weapon.length * 0.5f;
+    
+    float x1 = weaponWorldX - cos_w * halfLen;
+    float y1 = weaponWorldY - sin_w * halfLen;
+    float x2 = weaponWorldX + cos_w * halfLen;
+    float y2 = weaponWorldY + sin_w * halfLen;
+    
+    // Check distance from target center to weapon segment
+    float dist = DistancePointToSegment(target.x, target.y, x1, y1, x2, y2);
+    return dist < CIRCLE_RADIUS;
+}
+
+// Check and handle circle-circle collision
+void HandlePlayerCollision(Circle& c1, Circle& c2) {
+    float dx = c2.x - c1.x;
+    float dy = c2.y - c1.y;
+    float distSq = dx * dx + dy * dy;
+    float minDist = CIRCLE_RADIUS * 2.0f;
+    
+    if (distSq < minDist * minDist && distSq > 0.001f) {
+        // Collision detected - elastic bounce
+        float dist = sqrtf(distSq);
+        
+        // Normalize
+        dx /= dist;
+        dy /= dist;
+        
+        // Separate circles
+        float overlap = minDist - dist;
+        c1.x -= dx * overlap * 0.5f;
+        c1.y -= dy * overlap * 0.5f;
+        c2.x += dx * overlap * 0.5f;
+        c2.y += dy * overlap * 0.5f;
+        
+        // Elastic bounce (swap velocity components along collision normal)
+        float v1n = c1.vx * dx + c1.vy * dy;
+        float v2n = c2.vx * dx + c2.vy * dy;
+        
+        c1.vx += (v2n - v1n) * dx;
+        c1.vy += (v2n - v1n) * dy;
+        c2.vx += (v1n - v2n) * dx;
+        c2.vy += (v1n - v2n) * dy;
+    }
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     // Window settings
@@ -106,34 +204,41 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Initialize circles
     Circle circles[2];
     
-    // Yellow circle (92)
+    // Yellow circle (92) with boomerang
     circles[0].x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
     circles[0].y = FRAME_BOTTOM - 80.0f;
     circles[0].vx = 2.5f;
     circles[0].vy = -3.0f;
+    circles[0].angle = 0.0f;
+    circles[0].angularVel = 0.03f;  // Rotation speed
     circles[0].number = 92;
     circles[0].color = COLOR_YELLOW;
+    circles[0].hitTimer = 0.0f;
+    circles[0].weapon.type = WEAPON_BOOMERANG;
+    circles[0].weapon.offsetX = 40.0f;  // Offset in local space
+    circles[0].weapon.offsetY = 0.0f;
+    circles[0].weapon.length = 25.0f;   // For collision
+    circles[0].weapon.color = COLOR_YELLOW;
+    circles[0].weapon.weaponAngle = 0.0f;
+    circles[0].weapon.weaponRotSpeed = 0.05f;
     
-    // Cyan circle (91)
+    // Cyan circle (91) with spear
     circles[1].x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
     circles[1].y = FRAME_BOTTOM - 80.0f;
     circles[1].vx = -2.0f;
     circles[1].vy = -3.5f;
+    circles[1].angle = 0.0f;
+    circles[1].angularVel = -0.025f;  // Rotation speed (opposite direction)
     circles[1].number = 91;
     circles[1].color = COLOR_CYAN;
-    
-    // Initialize weapons
-    Weapon boomerang;
-    boomerang.x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
-    boomerang.y = FRAME_TOP + 60.0f;
-    boomerang.angle = 0.0f;
-    boomerang.rotationSpeed = 0.05f;
-    
-    Weapon spear;
-    spear.x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
-    spear.y = FRAME_TOP + 60.0f;
-    spear.angle = 0.0f;
-    spear.rotationSpeed = 0.04f;
+    circles[1].hitTimer = 0.0f;
+    circles[1].weapon.type = WEAPON_SPEAR;
+    circles[1].weapon.offsetX = 45.0f;  // Offset in local space
+    circles[1].weapon.offsetY = 0.0f;
+    circles[1].weapon.length = 30.0f;   // For collision
+    circles[1].weapon.color = COLOR_CYAN;
+    circles[1].weapon.weaponAngle = 0.0f;
+    circles[1].weapon.weaponRotSpeed = 0.04f;
     
     // Main loop
     while (ProcessMessage() == 0) {
@@ -155,6 +260,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             circles[i].x += circles[i].vx;
             circles[i].y += circles[i].vy;
             
+            // Update rotation
+            circles[i].angle += circles[i].angularVel;
+            
+            // Update weapon rotation
+            circles[i].weapon.weaponAngle += circles[i].weapon.weaponRotSpeed;
+            
+            // Update hit timer
+            if (circles[i].hitTimer > 0.0f) {
+                circles[i].hitTimer -= 1.0f;
+            }
+            
             // Wall collision
             if (circles[i].x - CIRCLE_RADIUS < FRAME_LEFT) {
                 circles[i].x = FRAME_LEFT + CIRCLE_RADIUS;
@@ -172,21 +288,53 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 circles[i].y = FRAME_BOTTOM - CIRCLE_RADIUS;
                 circles[i].vy = -circles[i].vy;
             }
+        }
+        
+        // Handle player-player collision
+        HandlePlayerCollision(circles[0], circles[1]);
+        
+        // Check weapon hits
+        if (CheckWeaponHit(circles[0], circles[1])) {
+            circles[1].hitTimer = 10.0f;  // Hit feedback duration
+        }
+        if (CheckWeaponHit(circles[1], circles[0])) {
+            circles[0].hitTimer = 10.0f;
+        }
+        
+        // Draw circles with hit feedback
+        for (int i = 0; i < 2; i++) {
+            unsigned int drawColor = circles[i].color;
+            
+            // Apply red flash if hit
+            if (circles[i].hitTimer > 0.0f) {
+                // Mix with red for hit feedback
+                drawColor = 0xFF6666;  // Reddish tint
+            }
             
             // Draw circle with outline
-            DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, circles[i].color, TRUE);
+            DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, drawColor, TRUE);
             DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, COLOR_BLACK, FALSE);
             
             // Draw number on circle
             DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].number);
         }
         
-        // Update and draw weapons
-        boomerang.angle += boomerang.rotationSpeed;
-        DrawBoomerang(boomerang.x, boomerang.y, boomerang.angle, COLOR_YELLOW);
-        
-        spear.angle += spear.rotationSpeed;
-        DrawSpear(spear.x, spear.y, spear.angle, COLOR_CYAN);
+        // Draw weapons at player positions with rotated offsets
+        for (int i = 0; i < 2; i++) {
+            // Calculate weapon world position
+            float cos_player = cosf(circles[i].angle);
+            float sin_player = sinf(circles[i].angle);
+            
+            float weaponWorldX = circles[i].x + (cos_player * circles[i].weapon.offsetX - sin_player * circles[i].weapon.offsetY);
+            float weaponWorldY = circles[i].y + (sin_player * circles[i].weapon.offsetX + cos_player * circles[i].weapon.offsetY);
+            
+            // Draw weapon
+            if (circles[i].weapon.type == WEAPON_BOOMERANG) {
+                DrawBoomerang(weaponWorldX, weaponWorldY, circles[i].weapon.weaponAngle, circles[i].weapon.color);
+            } else {
+                DrawSpear(weaponWorldX, weaponWorldY, circles[i].weapon.weaponAngle, circles[i].weapon.color);
+            }
+        }
         
         // Draw title text at top
         DrawFormatString(SCREEN_WIDTH / 2 + TITLE_X_OFFSET, TITLE_Y_POSITION, COLOR_BLACK, "Boomerang VS Spear");
