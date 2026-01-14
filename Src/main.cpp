@@ -43,12 +43,18 @@ const int KO_TEXT_Y_OFFSET = -10;
 
 // Map constants
 const int MAP_ROWS = 7;
+const int MAP_MIN_NODES_PER_ROW = 2;
 const int MAP_MAX_NODES_PER_ROW = 4;
 const float MAP_NODE_RADIUS = 20.0f;
 const float MAP_LEFT = 100.0f;
 const float MAP_RIGHT = 500.0f;
 const float MAP_TOP = 100.0f;
 const float MAP_BOTTOM = 650.0f;
+const int NODE_PROB_NORMAL = 60;    // 60% normal nodes
+const int NODE_PROB_ELITE = 70;     // 10% elite nodes (60-70)
+const int NODE_PROB_EVENT = 80;     // 10% event nodes (70-80)
+const int NODE_PROB_SHOP = 90;      // 10% shop nodes (80-90)
+// Remaining 10% are rest nodes (90-100)
 const unsigned int COLOR_RED = 0xFF0000;
 const unsigned int COLOR_GREEN = 0x00FF00;
 const unsigned int COLOR_BLUE = 0x0000FF;
@@ -117,11 +123,16 @@ struct Circle {
     bool wasHitLastFrame;  // Track if was being hit last frame (for separation detection)
 };
 
+// Helper function to clamp HP to valid range
+int ClampHP(int hp) {
+    return (hp > MAX_HP) ? MAX_HP : ((hp < 0) ? 0 : hp);
+}
+
 // Boss save/load functions
 void SaveBossToJSON(const Circle& player) {
     try {
         json j;
-        j["hp"] = (player.hp > MAX_HP) ? MAX_HP : player.hp;
+        j["hp"] = ClampHP(player.hp);
         j["maxHP"] = MAX_HP;
         j["vx"] = player.vx;
         j["vy"] = player.vy;
@@ -155,18 +166,25 @@ bool LoadBossFromJSON(Circle& boss) {
         file >> j;
         file.close();
         
-        // Load boss parameters with clamping
+        // Load boss parameters with clamping and validation
         int loadedHP = j.value("hp", MAX_HP);
-        boss.hp = (loadedHP > MAX_HP) ? MAX_HP : loadedHP;
+        boss.hp = ClampHP(loadedHP);
         boss.vx = j.value("vx", -2.0f);
         boss.vy = j.value("vy", -3.5f);
         boss.angularVel = j.value("angularVel", -0.025f);
-        boss.color = j.value("color", (unsigned int)COLOR_CYAN);
-        boss.weapon.type = (WeaponType)j.value("weaponType", (int)WEAPON_SPEAR);
+        boss.color = j.value("color", COLOR_CYAN);
+        
+        // Validate weapon type enum
+        int weaponTypeInt = j.value("weaponType", (int)WEAPON_SPEAR);
+        if (weaponTypeInt < WEAPON_BOOMERANG || weaponTypeInt > WEAPON_SPEAR) {
+            weaponTypeInt = WEAPON_SPEAR;  // Default to spear if invalid
+        }
+        boss.weapon.type = (WeaponType)weaponTypeInt;
+        
         boss.weapon.offsetX = j.value("weaponOffsetX", 45.0f);
         boss.weapon.offsetY = j.value("weaponOffsetY", 0.0f);
         boss.weapon.length = j.value("weaponLength", 30.0f);
-        boss.weapon.color = j.value("weaponColor", (unsigned int)COLOR_CYAN);
+        boss.weapon.color = j.value("weaponColor", COLOR_CYAN);
         
         return true;
     } catch (...) {
@@ -419,8 +437,8 @@ std::vector<MapNode> GenerateMap() {
     
     // Rows 1-5: Mixed nodes (normal, elite, event, shop, rest)
     for (int row = 1; row < MAP_ROWS - 1; row++) {
-        // 2-4 nodes per row (average ~3)
-        std::uniform_int_distribution<> nodeDist(2, 4);
+        // Random nodes per row based on constants
+        std::uniform_int_distribution<> nodeDist(MAP_MIN_NODES_PER_ROW, MAP_MAX_NODES_PER_ROW);
         int numNodes = nodeDist(gen);
         
         for (int col = 0; col < numNodes; col++) {
@@ -430,16 +448,16 @@ std::vector<MapNode> GenerateMap() {
             node.visited = false;
             node.reachable = false;
             
-            // Node type distribution: 60% normal, 10% elite, 10% event, 10% shop, 10% rest
+            // Node type distribution using probability constants
             std::uniform_int_distribution<> typeDist(0, 99);
             int typeRoll = typeDist(gen);
-            if (typeRoll < 60) {
+            if (typeRoll < NODE_PROB_NORMAL) {
                 node.type = NODE_NORMAL;
-            } else if (typeRoll < 70) {
+            } else if (typeRoll < NODE_PROB_ELITE) {
                 node.type = NODE_ELITE;
-            } else if (typeRoll < 80) {
+            } else if (typeRoll < NODE_PROB_EVENT) {
                 node.type = NODE_EVENT;
-            } else if (typeRoll < 90) {
+            } else if (typeRoll < NODE_PROB_SHOP) {
                 node.type = NODE_SHOP;
             } else {
                 node.type = NODE_REST;
