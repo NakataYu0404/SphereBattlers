@@ -137,11 +137,19 @@ int ClampHP(int hp) {
 }
 
 // Helper function to detect key press edge (new press only, not held)
+// Note: Updates prevState as a side effect to track the current key state
 bool DetectKeyPressEdge(int keyCode, bool& prevState) {
     bool currentState = CheckHitKey(keyCode) != 0;
     bool pressed = currentState && !prevState;
     prevState = currentState;
     return pressed;
+}
+
+// Helper function to reset map input state after battle
+void ResetMapInputState(float& cooldown, bool& prevEnter, bool& prevSpace) {
+    cooldown = MAP_INPUT_COOLDOWN_DURATION;
+    prevEnter = true;   // Mark as pressed to prevent immediate re-trigger
+    prevSpace = true;
 }
 
 // Boss save/load functions
@@ -1046,9 +1054,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         }
                         
                         // Set input cooldown and clear input state before returning to map
-                        mapInputCooldown = MAP_INPUT_COOLDOWN_DURATION;
-                        prevEnterKeyState = true;  // Prevent immediate re-trigger
-                        prevSpaceKeyState = true;
+                        ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
                         currentScene = SCENE_MAP;
                     } else {
                         // Player lost - restart from beginning
@@ -1064,9 +1070,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         playerChar.hp = MAX_HP;
                         
                         // Set input cooldown and clear input state before returning to map
-                        mapInputCooldown = MAP_INPUT_COOLDOWN_DURATION;
-                        prevEnterKeyState = true;  // Prevent immediate re-trigger
-                        prevSpaceKeyState = true;
+                        ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
                         currentScene = SCENE_MAP;
                     }
                 }
