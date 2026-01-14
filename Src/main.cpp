@@ -163,10 +163,11 @@ bool DetectKeyPressEdge(int keyCode, bool& prevState) {
 
 // Helper function to reset map input state after battle
 // Marks keys as "pressed" so DetectKeyPressEdge will require a key release before detecting next press
-void ResetMapInputState(float& cooldown, bool& prevEnter, bool& prevSpace) {
+void ResetMapInputState(float& cooldown, bool& prevEnter, bool& prevSpace, int& prevMouse) {
     cooldown = MAP_INPUT_COOLDOWN_DURATION;
     prevEnter = true;   // Mark as pressed to prevent immediate re-trigger
     prevSpace = true;
+    prevMouse = GetMouseInput();  // Update to current state to prevent immediate re-trigger
 }
 
 // Helper function to calculate total weapon damage for a character
@@ -1006,8 +1007,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             
                             // Scale based on drag distance (normalize and clamp)
                             float scale = mag / AIM_ARROW_LENGTH;
-                            scale = (scale < AIM_MIN_SPEED_SCALE) ? AIM_MIN_SPEED_SCALE : 
-                                   ((scale > AIM_MAX_SPEED_SCALE) ? AIM_MAX_SPEED_SCALE : scale);
+                            if (scale < AIM_MIN_SPEED_SCALE) scale = AIM_MIN_SPEED_SCALE;
+                            if (scale > AIM_MAX_SPEED_SCALE) scale = AIM_MAX_SPEED_SCALE;
                             
                             // Set player velocity
                             circles[0].vx = (dx / mag) * baseSpeedMag * scale;
@@ -1310,11 +1311,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             playerChar.baseSpeed = 1.0f;
                             
                             // Set input cooldown and clear input state before returning to map
-                            ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
+                            ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
                             currentScene = SCENE_MAP;
                         } else {
                             // Transition to reward selection scene
-                            ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
+                            ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
                             currentScene = SCENE_REWARD;
                         }
                     } else {
@@ -1334,7 +1335,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         playerChar.baseSpeed = 1.0f;
                         
                         // Set input cooldown and clear input state before returning to map
-                        ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
+                        ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
                         currentScene = SCENE_MAP;
                     }
                 }
@@ -1483,7 +1484,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 rewardSceneInitialized = false;
                 
                 // Set input cooldown and clear input state before returning to map
-                ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
+                ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
                 currentScene = SCENE_MAP;
             }
             
