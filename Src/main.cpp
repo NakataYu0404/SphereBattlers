@@ -1,6 +1,12 @@
 #include <DxLib.h>
 #include <windows.h>
 #include <cmath>
+#include <vector>
+#include <random>
+#include <fstream>
+#include "Library/nlohmann/json.hpp"
+
+using json = nlohmann::json;
 
 // Constants
 const int SCREEN_WIDTH = 600;
@@ -35,6 +41,47 @@ const int CIRCLE_NUMBER_Y_OFFSET = -8;
 const int KO_TEXT_X_OFFSET = -20;
 const int KO_TEXT_Y_OFFSET = -10;
 
+// Map constants
+const int MAP_ROWS = 7;
+const int MAP_MAX_NODES_PER_ROW = 4;
+const float MAP_NODE_RADIUS = 20.0f;
+const unsigned int COLOR_RED = 0xFF0000;
+const unsigned int COLOR_GREEN = 0x00FF00;
+const unsigned int COLOR_BLUE = 0x0000FF;
+const unsigned int COLOR_PURPLE = 0x800080;
+const unsigned int COLOR_ORANGE = 0xFFA500;
+const unsigned int COLOR_GRAY = 0x808080;
+const unsigned int COLOR_WHITE = 0xFFFFFF;
+const char* BOSS_SAVE_FILE = "boss_save.json";
+
+// Scene enum
+enum Scene {
+    SCENE_MAP,
+    SCENE_BATTLE
+};
+
+// Node type enum
+enum NodeType {
+    NODE_START,
+    NODE_NORMAL,
+    NODE_ELITE,
+    NODE_EVENT,
+    NODE_SHOP,
+    NODE_REST,
+    NODE_BOSS
+};
+
+// Map node structure
+struct MapNode {
+    int row;
+    int col;
+    NodeType type;
+    float x, y;
+    std::vector<int> connectedNodes;  // Indices of connected nodes in next row
+    bool visited;
+    bool reachable;
+};
+
 // Weapon type enum
 enum WeaponType {
     WEAPON_BOOMERANG,
@@ -65,6 +112,91 @@ struct Circle {
     float hitCooldown;  // Cooldown timer before can be hit again (counts down)
     bool wasHitLastFrame;  // Track if was being hit last frame (for separation detection)
 };
+
+// Boss save/load functions
+void SaveBossToJSON(const Circle& player) {
+    try {
+        json j;
+        j["hp"] = (player.hp > MAX_HP) ? MAX_HP : player.hp;
+        j["maxHP"] = MAX_HP;
+        j["vx"] = player.vx;
+        j["vy"] = player.vy;
+        j["angularVel"] = player.angularVel;
+        j["color"] = player.color;
+        j["radius"] = CIRCLE_RADIUS;
+        j["weaponType"] = (int)player.weapon.type;
+        j["weaponOffsetX"] = player.weapon.offsetX;
+        j["weaponOffsetY"] = player.weapon.offsetY;
+        j["weaponLength"] = player.weapon.length;
+        j["weaponColor"] = player.weapon.color;
+        
+        std::ofstream file(BOSS_SAVE_FILE);
+        if (file.is_open()) {
+            file << j.dump(2);
+            file.close();
+        }
+    } catch (...) {
+        // Fail silently if save fails
+    }
+}
+
+bool LoadBossFromJSON(Circle& boss) {
+    try {
+        std::ifstream file(BOSS_SAVE_FILE);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        json j;
+        file >> j;
+        file.close();
+        
+        // Load boss parameters with clamping
+        int loadedHP = j.value("hp", MAX_HP);
+        boss.hp = (loadedHP > MAX_HP) ? MAX_HP : loadedHP;
+        boss.vx = j.value("vx", -2.0f);
+        boss.vy = j.value("vy", -3.5f);
+        boss.angularVel = j.value("angularVel", -0.025f);
+        boss.color = j.value("color", (unsigned int)COLOR_CYAN);
+        boss.weapon.type = (WeaponType)j.value("weaponType", (int)WEAPON_SPEAR);
+        boss.weapon.offsetX = j.value("weaponOffsetX", 45.0f);
+        boss.weapon.offsetY = j.value("weaponOffsetY", 0.0f);
+        boss.weapon.length = j.value("weaponLength", 30.0f);
+        boss.weapon.color = j.value("weaponColor", (unsigned int)COLOR_CYAN);
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// Get node type color
+unsigned int GetNodeColor(NodeType type) {
+    switch (type) {
+        case NODE_START: return COLOR_GREEN;
+        case NODE_NORMAL: return COLOR_GRAY;
+        case NODE_ELITE: return COLOR_ORANGE;
+        case NODE_EVENT: return COLOR_BLUE;
+        case NODE_SHOP: return COLOR_YELLOW;
+        case NODE_REST: return COLOR_PURPLE;
+        case NODE_BOSS: return COLOR_RED;
+        default: return COLOR_GRAY;
+    }
+}
+
+// Get node type name
+const char* GetNodeTypeName(NodeType type) {
+    switch (type) {
+        case NODE_START: return "Start";
+        case NODE_NORMAL: return "Battle";
+        case NODE_ELITE: return "Elite";
+        case NODE_EVENT: return "Event";
+        case NODE_SHOP: return "Shop";
+        case NODE_REST: return "Rest";
+        case NODE_BOSS: return "Boss";
+        default: return "Unknown";
+    }
+}
 
 // Function to draw a boomerang
 void DrawBoomerang(float x, float y, float angle, unsigned int color) {
@@ -260,10 +392,182 @@ bool HandleWeaponCollision(Circle& c1, Circle& c2) {
     return false;
 }
 
+// Generate branching map
+std::vector<MapNode> GenerateMap() {
+    std::vector<MapNode> nodes;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    
+    // Track node counts per row
+    std::vector<std::vector<int>> rowNodes(MAP_ROWS);
+    
+    int nodeIndex = 0;
+    
+    // Row 0: Start node
+    MapNode startNode;
+    startNode.row = 0;
+    startNode.col = 0;
+    startNode.type = NODE_START;
+    startNode.visited = false;
+    startNode.reachable = true;
+    rowNodes[0].push_back(nodeIndex++);
+    nodes.push_back(startNode);
+    
+    // Rows 1-5: Mixed nodes (normal, elite, event, shop, rest)
+    for (int row = 1; row < MAP_ROWS - 1; row++) {
+        // 2-4 nodes per row (average ~3)
+        std::uniform_int_distribution<> nodeDist(2, 4);
+        int numNodes = nodeDist(gen);
+        
+        for (int col = 0; col < numNodes; col++) {
+            MapNode node;
+            node.row = row;
+            node.col = col;
+            node.visited = false;
+            node.reachable = false;
+            
+            // Node type distribution: 60% normal, 10% elite, 10% event, 10% shop, 10% rest
+            std::uniform_int_distribution<> typeDist(0, 99);
+            int typeRoll = typeDist(gen);
+            if (typeRoll < 60) {
+                node.type = NODE_NORMAL;
+            } else if (typeRoll < 70) {
+                node.type = NODE_ELITE;
+            } else if (typeRoll < 80) {
+                node.type = NODE_EVENT;
+            } else if (typeRoll < 90) {
+                node.type = NODE_SHOP;
+            } else {
+                node.type = NODE_REST;
+            }
+            
+            rowNodes[row].push_back(nodeIndex++);
+            nodes.push_back(node);
+        }
+    }
+    
+    // Row 6 (top): Boss node (single)
+    MapNode bossNode;
+    bossNode.row = MAP_ROWS - 1;
+    bossNode.col = 0;
+    bossNode.type = NODE_BOSS;
+    bossNode.visited = false;
+    bossNode.reachable = false;
+    rowNodes[MAP_ROWS - 1].push_back(nodeIndex++);
+    nodes.push_back(bossNode);
+    
+    // Connect nodes (roughly 2 edges upward per node on average)
+    for (int row = 0; row < MAP_ROWS - 1; row++) {
+        for (int idx : rowNodes[row]) {
+            int nextRowSize = (int)rowNodes[row + 1].size();
+            if (nextRowSize == 0) continue;
+            
+            // Each node connects to 1-3 nodes in next row (average 2)
+            std::uniform_int_distribution<> connDist(1, std::min(3, nextRowSize));
+            int numConnections = connDist(gen);
+            
+            // Randomly select nodes to connect to
+            std::vector<int> nextIndices = rowNodes[row + 1];
+            std::shuffle(nextIndices.begin(), nextIndices.end(), gen);
+            
+            for (int i = 0; i < numConnections && i < (int)nextIndices.size(); i++) {
+                nodes[idx].connectedNodes.push_back(nextIndices[i]);
+            }
+        }
+    }
+    
+    // Calculate node positions for display
+    const float mapLeft = 100.0f;
+    const float mapRight = 500.0f;
+    const float mapTop = 100.0f;
+    const float mapBottom = 650.0f;
+    const float rowSpacing = (mapBottom - mapTop) / (MAP_ROWS - 1);
+    
+    for (size_t i = 0; i < nodes.size(); i++) {
+        int row = nodes[i].row;
+        int numNodesInRow = (int)rowNodes[row].size();
+        int colIndex = 0;
+        for (int j = 0; j < numNodesInRow; j++) {
+            if (rowNodes[row][j] == (int)i) {
+                colIndex = j;
+                break;
+            }
+        }
+        
+        float rowWidth = mapRight - mapLeft;
+        float nodeSpacing = (numNodesInRow > 1) ? rowWidth / (numNodesInRow - 1) : 0.0f;
+        
+        nodes[i].x = mapLeft + (numNodesInRow > 1 ? colIndex * nodeSpacing : rowWidth * 0.5f);
+        nodes[i].y = mapBottom - row * rowSpacing;  // Invert so row 0 is at bottom
+    }
+    
+    return nodes;
+}
+
+// Draw map scene
+void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highlightedNodeIndex) {
+    // Draw title
+    DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - Select Path");
+    
+    // Draw edges first (behind nodes)
+    for (size_t i = 0; i < nodes.size(); i++) {
+        for (int connectedIdx : nodes[i].connectedNodes) {
+            unsigned int edgeColor = COLOR_GRAY;
+            
+            // Highlight edges from current node
+            if ((int)i == currentNodeIndex) {
+                edgeColor = COLOR_BLACK;
+            }
+            
+            DrawLineAA(nodes[i].x, nodes[i].y, 
+                      nodes[connectedIdx].x, nodes[connectedIdx].y, 
+                      edgeColor, 2.0f);
+        }
+    }
+    
+    // Draw nodes
+    for (size_t i = 0; i < nodes.size(); i++) {
+        unsigned int nodeColor = GetNodeColor(nodes[i].type);
+        
+        // Darken visited nodes
+        if (nodes[i].visited) {
+            nodeColor = COLOR_GRAY;
+        }
+        
+        // Draw node circle
+        DrawCircleAA(nodes[i].x, nodes[i].y, MAP_NODE_RADIUS, 32, nodeColor, TRUE);
+        
+        // Highlight current node
+        if ((int)i == currentNodeIndex) {
+            DrawCircleAA(nodes[i].x, nodes[i].y, MAP_NODE_RADIUS + 3, 32, COLOR_WHITE, FALSE);
+            DrawCircleAA(nodes[i].x, nodes[i].y, MAP_NODE_RADIUS + 5, 32, COLOR_BLACK, FALSE);
+        }
+        
+        // Highlight hovered/selected node
+        if ((int)i == highlightedNodeIndex && nodes[i].reachable) {
+            DrawCircleAA(nodes[i].x, nodes[i].y, MAP_NODE_RADIUS + 2, 32, COLOR_YELLOW, FALSE);
+        }
+        
+        // Draw black outline
+        DrawCircleAA(nodes[i].x, nodes[i].y, MAP_NODE_RADIUS, 32, COLOR_BLACK, FALSE);
+    }
+    
+    // Draw node type info at bottom
+    if (highlightedNodeIndex >= 0 && highlightedNodeIndex < (int)nodes.size()) {
+        const char* typeName = GetNodeTypeName(nodes[highlightedNodeIndex].type);
+        DrawFormatString(SCREEN_WIDTH / 2 - 50, SCREEN_HEIGHT - 40, COLOR_BLACK, 
+                        "Node: %s", typeName);
+    }
+    
+    // Draw instructions
+    DrawFormatString(10, SCREEN_HEIGHT - 60, COLOR_BLACK, "Mouse: Click | Keys: Arrow/WASD + Enter/Space");
+    DrawFormatString(10, SCREEN_HEIGHT - 40, COLOR_BLACK, "ESC: Quit");
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     // Window settings
-    SetWindowText("Boomerang VS Spear");
+    SetWindowText("Sphere Battlers - Map & Battle");
     SetGraphMode(SCREEN_WIDTH, SCREEN_HEIGHT, 32);
     ChangeWindowMode(TRUE);
     SetAlwaysRunFlag(TRUE);
@@ -274,51 +578,49 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     SetDrawScreen(DX_SCREEN_BACK);
     
-    // Initialize circles
+    // Initialize scene state
+    Scene currentScene = SCENE_MAP;
+    
+    // Generate map
+    std::vector<MapNode> mapNodes = GenerateMap();
+    int currentNodeIndex = 0;  // Start at first node
+    int highlightedNodeIndex = 0;
+    mapNodes[0].visited = true;
+    
+    // Update reachability from start
+    for (int connectedIdx : mapNodes[0].connectedNodes) {
+        mapNodes[connectedIdx].reachable = true;
+    }
+    
+    // Battle state
     Circle circles[2];
-    
-    // Yellow circle (92) with boomerang
-    circles[0].x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
-    circles[0].y = FRAME_BOTTOM - 80.0f;
-    circles[0].vx = 2.5f;
-    circles[0].vy = -3.0f;
-    circles[0].angle = 0.0f;
-    circles[0].angularVel = 0.03f;  // Rotation speed
-    circles[0].number = 92;
-    circles[0].color = COLOR_YELLOW;
-    circles[0].hitTimer = 0.0f;
-    circles[0].hp = MAX_HP;
-    circles[0].isAlive = true;
-    circles[0].hitCooldown = 0.0f;
-    circles[0].wasHitLastFrame = false;
-    circles[0].weapon.type = WEAPON_BOOMERANG;
-    circles[0].weapon.offsetX = 40.0f;  // Offset in local space
-    circles[0].weapon.offsetY = 0.0f;
-    circles[0].weapon.length = 25.0f;   // For collision
-    circles[0].weapon.color = COLOR_YELLOW;
-    
-    // Cyan circle (91) with spear
-    circles[1].x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
-    circles[1].y = FRAME_BOTTOM - 80.0f;
-    circles[1].vx = -2.0f;
-    circles[1].vy = -3.5f;
-    circles[1].angle = 0.0f;
-    circles[1].angularVel = -0.025f;  // Rotation speed (opposite direction)
-    circles[1].number = 91;
-    circles[1].color = COLOR_CYAN;
-    circles[1].hitTimer = 0.0f;
-    circles[1].hp = MAX_HP;
-    circles[1].isAlive = true;
-    circles[1].hitCooldown = 0.0f;
-    circles[1].wasHitLastFrame = false;
-    circles[1].weapon.type = WEAPON_SPEAR;
-    circles[1].weapon.offsetX = 45.0f;  // Offset in local space
-    circles[1].weapon.offsetY = 0.0f;
-    circles[1].weapon.length = 30.0f;   // For collision
-    circles[1].weapon.color = COLOR_CYAN;
-    
-    // Hit-stop timer (counts down)
     float hitStopTimer = 0.0f;
+    bool battleEnded = false;
+    bool playerWon = false;
+    
+    // Player character (persistent across battles)
+    Circle playerChar;
+    playerChar.x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
+    playerChar.y = FRAME_BOTTOM - 80.0f;
+    playerChar.vx = 2.5f;
+    playerChar.vy = -3.0f;
+    playerChar.angle = 0.0f;
+    playerChar.angularVel = 0.03f;
+    playerChar.number = 92;
+    playerChar.color = COLOR_YELLOW;
+    playerChar.hp = MAX_HP;
+    playerChar.weapon.type = WEAPON_BOOMERANG;
+    playerChar.weapon.offsetX = 40.0f;
+    playerChar.weapon.offsetY = 0.0f;
+    playerChar.weapon.length = 25.0f;
+    playerChar.weapon.color = COLOR_YELLOW;
+    
+    // Mouse state tracking
+    int prevMouseState = 0;
+    
+    // Keyboard navigation state
+    int keyPressDelay = 0;
+    const int KEY_PRESS_COOLDOWN = 10;
     
     // Main loop
     while (ProcessMessage() == 0) {
@@ -331,161 +633,445 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ClearDrawScreen();
         DrawBox(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BEIGE, TRUE);
         
-        // Draw frame box
-        DrawBox(FRAME_LEFT, FRAME_TOP, FRAME_RIGHT, FRAME_BOTTOM, COLOR_BLACK, FALSE);
-        
-        // Update hit-stop timer
-        bool inHitStop = (hitStopTimer > 0.0f);
-        if (inHitStop) {
-            hitStopTimer -= 1.0f;
-        }
-        
-        // Update and move circles (only if not in hit-stop)
-        if (!inHitStop) {
+        if (currentScene == SCENE_MAP) {
+            // ===== MAP SCENE =====
+            
+            // Update highlighted node based on mouse position
+            int mouseX, mouseY;
+            GetMousePoint(&mouseX, &mouseY);
+            highlightedNodeIndex = -1;
+            
+            for (size_t i = 0; i < mapNodes.size(); i++) {
+                if (!mapNodes[i].reachable || mapNodes[i].visited) continue;
+                
+                float dx = mouseX - mapNodes[i].x;
+                float dy = mouseY - mapNodes[i].y;
+                float distSq = dx * dx + dy * dy;
+                
+                if (distSq < MAP_NODE_RADIUS * MAP_NODE_RADIUS) {
+                    highlightedNodeIndex = (int)i;
+                    break;
+                }
+            }
+            
+            // Handle keyboard navigation
+            if (keyPressDelay > 0) {
+                keyPressDelay--;
+            }
+            
+            if (keyPressDelay == 0) {
+                // Find reachable nodes
+                std::vector<int> reachableIndices;
+                for (size_t i = 0; i < mapNodes.size(); i++) {
+                    if (mapNodes[i].reachable && !mapNodes[i].visited) {
+                        reachableIndices.push_back((int)i);
+                    }
+                }
+                
+                if (!reachableIndices.empty()) {
+                    // If no node highlighted, start with first reachable
+                    if (highlightedNodeIndex == -1 || !mapNodes[highlightedNodeIndex].reachable || mapNodes[highlightedNodeIndex].visited) {
+                        highlightedNodeIndex = reachableIndices[0];
+                    }
+                    
+                    // Find current position in reachable list
+                    int currentPosInReachable = 0;
+                    for (size_t i = 0; i < reachableIndices.size(); i++) {
+                        if (reachableIndices[i] == highlightedNodeIndex) {
+                            currentPosInReachable = (int)i;
+                            break;
+                        }
+                    }
+                    
+                    // Arrow keys or WASD to navigate
+                    bool moveLeft = CheckHitKey(KEY_INPUT_LEFT) || CheckHitKey(KEY_INPUT_A);
+                    bool moveRight = CheckHitKey(KEY_INPUT_RIGHT) || CheckHitKey(KEY_INPUT_D);
+                    bool moveUp = CheckHitKey(KEY_INPUT_UP) || CheckHitKey(KEY_INPUT_W);
+                    bool moveDown = CheckHitKey(KEY_INPUT_DOWN) || CheckHitKey(KEY_INPUT_S);
+                    
+                    if (moveLeft || moveUp) {
+                        currentPosInReachable = (currentPosInReachable - 1 + (int)reachableIndices.size()) % (int)reachableIndices.size();
+                        highlightedNodeIndex = reachableIndices[currentPosInReachable];
+                        keyPressDelay = KEY_PRESS_COOLDOWN;
+                    } else if (moveRight || moveDown) {
+                        currentPosInReachable = (currentPosInReachable + 1) % (int)reachableIndices.size();
+                        highlightedNodeIndex = reachableIndices[currentPosInReachable];
+                        keyPressDelay = KEY_PRESS_COOLDOWN;
+                    }
+                    
+                    // Enter or Space to select
+                    if ((CheckHitKey(KEY_INPUT_RETURN) || CheckHitKey(KEY_INPUT_SPACE)) && highlightedNodeIndex >= 0) {
+                        // Select this node
+                        currentNodeIndex = highlightedNodeIndex;
+                        mapNodes[currentNodeIndex].visited = true;
+                        
+                        // Update reachability
+                        for (size_t i = 0; i < mapNodes.size(); i++) {
+                            mapNodes[i].reachable = false;
+                        }
+                        for (int connectedIdx : mapNodes[currentNodeIndex].connectedNodes) {
+                            mapNodes[connectedIdx].reachable = true;
+                        }
+                        
+                        // Enter battle scene based on node type
+                        if (mapNodes[currentNodeIndex].type == NODE_NORMAL || 
+                            mapNodes[currentNodeIndex].type == NODE_ELITE || 
+                            mapNodes[currentNodeIndex].type == NODE_BOSS) {
+                            currentScene = SCENE_BATTLE;
+                            
+                            // Initialize battle
+                            // Player (yellow)
+                            circles[0] = playerChar;
+                            circles[0].x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
+                            circles[0].y = FRAME_BOTTOM - 80.0f;
+                            circles[0].hitTimer = 0.0f;
+                            circles[0].isAlive = true;
+                            circles[0].hitCooldown = 0.0f;
+                            circles[0].wasHitLastFrame = false;
+                            
+                            // Enemy (cyan) - boss or regular
+                            circles[1].x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
+                            circles[1].y = FRAME_BOTTOM - 80.0f;
+                            circles[1].angle = 0.0f;
+                            circles[1].number = 91;
+                            circles[1].hitTimer = 0.0f;
+                            circles[1].isAlive = true;
+                            circles[1].hitCooldown = 0.0f;
+                            circles[1].wasHitLastFrame = false;
+                            
+                            if (mapNodes[currentNodeIndex].type == NODE_BOSS) {
+                                // Try to load boss from JSON
+                                if (!LoadBossFromJSON(circles[1])) {
+                                    // Default boss
+                                    circles[1].vx = -2.0f;
+                                    circles[1].vy = -3.5f;
+                                    circles[1].angularVel = -0.025f;
+                                    circles[1].color = COLOR_CYAN;
+                                    circles[1].hp = MAX_HP;
+                                    circles[1].weapon.type = WEAPON_SPEAR;
+                                    circles[1].weapon.offsetX = 45.0f;
+                                    circles[1].weapon.offsetY = 0.0f;
+                                    circles[1].weapon.length = 30.0f;
+                                    circles[1].weapon.color = COLOR_CYAN;
+                                }
+                            } else {
+                                // Regular/elite enemy (for now, same as default)
+                                circles[1].vx = -2.0f;
+                                circles[1].vy = -3.5f;
+                                circles[1].angularVel = -0.025f;
+                                circles[1].color = COLOR_CYAN;
+                                circles[1].hp = MAX_HP;
+                                circles[1].weapon.type = WEAPON_SPEAR;
+                                circles[1].weapon.offsetX = 45.0f;
+                                circles[1].weapon.offsetY = 0.0f;
+                                circles[1].weapon.length = 30.0f;
+                                circles[1].weapon.color = COLOR_CYAN;
+                            }
+                            
+                            hitStopTimer = 0.0f;
+                            battleEnded = false;
+                            playerWon = false;
+                        } else {
+                            // Other node types (event, shop, rest) - just return to map for now
+                            // In a full implementation, these would have their own scenes
+                            keyPressDelay = KEY_PRESS_COOLDOWN * 2;
+                        }
+                    }
+                }
+            }
+            
+            // Mouse click to select node
+            int mouseState = GetMouseInput();
+            if ((mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT)) {
+                // Mouse clicked
+                if (highlightedNodeIndex >= 0 && mapNodes[highlightedNodeIndex].reachable && !mapNodes[highlightedNodeIndex].visited) {
+                    currentNodeIndex = highlightedNodeIndex;
+                    mapNodes[currentNodeIndex].visited = true;
+                    
+                    // Update reachability
+                    for (size_t i = 0; i < mapNodes.size(); i++) {
+                        mapNodes[i].reachable = false;
+                    }
+                    for (int connectedIdx : mapNodes[currentNodeIndex].connectedNodes) {
+                        mapNodes[connectedIdx].reachable = true;
+                    }
+                    
+                    // Enter battle scene
+                    if (mapNodes[currentNodeIndex].type == NODE_NORMAL || 
+                        mapNodes[currentNodeIndex].type == NODE_ELITE || 
+                        mapNodes[currentNodeIndex].type == NODE_BOSS) {
+                        currentScene = SCENE_BATTLE;
+                        
+                        // Initialize battle (same as keyboard selection above)
+                        circles[0] = playerChar;
+                        circles[0].x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
+                        circles[0].y = FRAME_BOTTOM - 80.0f;
+                        circles[0].hitTimer = 0.0f;
+                        circles[0].isAlive = true;
+                        circles[0].hitCooldown = 0.0f;
+                        circles[0].wasHitLastFrame = false;
+                        
+                        circles[1].x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
+                        circles[1].y = FRAME_BOTTOM - 80.0f;
+                        circles[1].angle = 0.0f;
+                        circles[1].number = 91;
+                        circles[1].hitTimer = 0.0f;
+                        circles[1].isAlive = true;
+                        circles[1].hitCooldown = 0.0f;
+                        circles[1].wasHitLastFrame = false;
+                        
+                        if (mapNodes[currentNodeIndex].type == NODE_BOSS) {
+                            if (!LoadBossFromJSON(circles[1])) {
+                                circles[1].vx = -2.0f;
+                                circles[1].vy = -3.5f;
+                                circles[1].angularVel = -0.025f;
+                                circles[1].color = COLOR_CYAN;
+                                circles[1].hp = MAX_HP;
+                                circles[1].weapon.type = WEAPON_SPEAR;
+                                circles[1].weapon.offsetX = 45.0f;
+                                circles[1].weapon.offsetY = 0.0f;
+                                circles[1].weapon.length = 30.0f;
+                                circles[1].weapon.color = COLOR_CYAN;
+                            }
+                        } else {
+                            circles[1].vx = -2.0f;
+                            circles[1].vy = -3.5f;
+                            circles[1].angularVel = -0.025f;
+                            circles[1].color = COLOR_CYAN;
+                            circles[1].hp = MAX_HP;
+                            circles[1].weapon.type = WEAPON_SPEAR;
+                            circles[1].weapon.offsetX = 45.0f;
+                            circles[1].weapon.offsetY = 0.0f;
+                            circles[1].weapon.length = 30.0f;
+                            circles[1].weapon.color = COLOR_CYAN;
+                        }
+                        
+                        hitStopTimer = 0.0f;
+                        battleEnded = false;
+                        playerWon = false;
+                    }
+                }
+            }
+            prevMouseState = mouseState;
+            
+            // Draw map
+            DrawMap(mapNodes, currentNodeIndex, highlightedNodeIndex);
+            
+        } else if (currentScene == SCENE_BATTLE) {
+            // ===== BATTLE SCENE =====
+            
+            // Draw frame box
+            DrawBox(FRAME_LEFT, FRAME_TOP, FRAME_RIGHT, FRAME_BOTTOM, COLOR_BLACK, FALSE);
+            
+            if (!battleEnded) {
+                // Update hit-stop timer
+                bool inHitStop = (hitStopTimer > 0.0f);
+                if (inHitStop) {
+                    hitStopTimer -= 1.0f;
+                }
+                
+                // Update and move circles (only if not in hit-stop)
+                if (!inHitStop) {
+                    for (int i = 0; i < 2; i++) {
+                        if (!circles[i].isAlive) continue;
+                        
+                        // Update position
+                        circles[i].x += circles[i].vx;
+                        circles[i].y += circles[i].vy;
+                        
+                        // Update rotation
+                        circles[i].angle += circles[i].angularVel;
+                        
+                        // Wall collision
+                        if (circles[i].x - CIRCLE_RADIUS < FRAME_LEFT) {
+                            circles[i].x = FRAME_LEFT + CIRCLE_RADIUS;
+                            circles[i].vx = -circles[i].vx;
+                        }
+                        if (circles[i].x + CIRCLE_RADIUS > FRAME_RIGHT) {
+                            circles[i].x = FRAME_RIGHT - CIRCLE_RADIUS;
+                            circles[i].vx = -circles[i].vx;
+                        }
+                        if (circles[i].y - CIRCLE_RADIUS < FRAME_TOP) {
+                            circles[i].y = FRAME_TOP + CIRCLE_RADIUS;
+                            circles[i].vy = -circles[i].vy;
+                        }
+                        if (circles[i].y + CIRCLE_RADIUS > FRAME_BOTTOM) {
+                            circles[i].y = FRAME_BOTTOM - CIRCLE_RADIUS;
+                            circles[i].vy = -circles[i].vy;
+                        }
+                    }
+                    
+                    // Handle player-player collision (only if both alive)
+                    if (circles[0].isAlive && circles[1].isAlive) {
+                        HandlePlayerCollision(circles[0], circles[1]);
+                    }
+                    
+                    // Check weapon hits (only if both alive)
+                    if (circles[0].isAlive && circles[1].isAlive) {
+                        // Check if yellow's weapon hits cyan
+                        bool yellowHitsCyan = CheckWeaponHit(circles[0], circles[1]);
+                        if (yellowHitsCyan) {
+                            // Apply damage only if cooldown expired and we had separation
+                            if (circles[1].hitCooldown <= 0.0f && !circles[1].wasHitLastFrame) {
+                                circles[1].hitTimer = HIT_FEEDBACK_DURATION;
+                                circles[1].hp -= WEAPON_DAMAGE;
+                                if (circles[1].hp <= 0) {
+                                    circles[1].isAlive = false;
+                                    battleEnded = true;
+                                    playerWon = true;
+                                }
+                                circles[1].hitCooldown = HIT_COOLDOWN_DURATION;
+                                hitStopTimer = HIT_STOP_DURATION;
+                            }
+                            circles[1].wasHitLastFrame = true;
+                        } else {
+                            circles[1].wasHitLastFrame = false;
+                        }
+                        
+                        // Check if cyan's weapon hits yellow
+                        bool cyanHitsYellow = CheckWeaponHit(circles[1], circles[0]);
+                        if (cyanHitsYellow) {
+                            // Apply damage only if cooldown expired and we had separation
+                            if (circles[0].hitCooldown <= 0.0f && !circles[0].wasHitLastFrame) {
+                                circles[0].hitTimer = HIT_FEEDBACK_DURATION;
+                                circles[0].hp -= WEAPON_DAMAGE;
+                                if (circles[0].hp <= 0) {
+                                    circles[0].isAlive = false;
+                                    battleEnded = true;
+                                    playerWon = false;
+                                }
+                                circles[0].hitCooldown = HIT_COOLDOWN_DURATION;
+                                hitStopTimer = HIT_STOP_DURATION;
+                            }
+                            circles[0].wasHitLastFrame = true;
+                        } else {
+                            circles[0].wasHitLastFrame = false;
+                        }
+                    }
+                    
+                    // Handle weapon-weapon collision (only if both alive)
+                    if (circles[0].isAlive && circles[1].isAlive) {
+                        if (HandleWeaponCollision(circles[0], circles[1])) {
+                            hitStopTimer = HIT_STOP_DURATION;
+                        }
+                    }
+                }
+                
+                // Update hit timer (always, even during hit-stop)
+                for (int i = 0; i < 2; i++) {
+                    if (circles[i].hitTimer > 0.0f) {
+                        circles[i].hitTimer -= 1.0f;
+                    }
+                    if (circles[i].hitCooldown > 0.0f) {
+                        circles[i].hitCooldown -= 1.0f;
+                    }
+                }
+            } else {
+                // Battle ended - wait for input to return to map
+                if (CheckHitKey(KEY_INPUT_RETURN) || CheckHitKey(KEY_INPUT_SPACE)) {
+                    if (playerWon) {
+                        // Update player character state
+                        playerChar.hp = circles[0].hp;
+                        playerChar.vx = circles[0].vx;
+                        playerChar.vy = circles[0].vy;
+                        playerChar.angularVel = circles[0].angularVel;
+                        
+                        // If defeated boss, save to JSON
+                        if (mapNodes[currentNodeIndex].type == NODE_BOSS) {
+                            SaveBossToJSON(playerChar);
+                        }
+                        
+                        // Check if reached boss (end of run)
+                        if (mapNodes[currentNodeIndex].type == NODE_BOSS) {
+                            // Run completed - could show victory screen or restart
+                            // For now, just generate a new map
+                            mapNodes = GenerateMap();
+                            currentNodeIndex = 0;
+                            highlightedNodeIndex = 0;
+                            mapNodes[0].visited = true;
+                            for (int connectedIdx : mapNodes[0].connectedNodes) {
+                                mapNodes[connectedIdx].reachable = true;
+                            }
+                            
+                            // Reset player
+                            playerChar.hp = MAX_HP;
+                        }
+                        
+                        currentScene = SCENE_MAP;
+                    } else {
+                        // Player lost - restart from beginning
+                        mapNodes = GenerateMap();
+                        currentNodeIndex = 0;
+                        highlightedNodeIndex = 0;
+                        mapNodes[0].visited = true;
+                        for (int connectedIdx : mapNodes[0].connectedNodes) {
+                            mapNodes[connectedIdx].reachable = true;
+                        }
+                        
+                        // Reset player
+                        playerChar.hp = MAX_HP;
+                        currentScene = SCENE_MAP;
+                    }
+                }
+            }
+            
+            // Draw circles with hit feedback (only if alive)
             for (int i = 0; i < 2; i++) {
                 if (!circles[i].isAlive) continue;
                 
-                // Update position
-                circles[i].x += circles[i].vx;
-                circles[i].y += circles[i].vy;
+                unsigned int drawColor = circles[i].color;
                 
-                // Update rotation
-                circles[i].angle += circles[i].angularVel;
+                // Apply red flash if hit
+                if (circles[i].hitTimer > 0.0f) {
+                    drawColor = COLOR_HIT_FEEDBACK;
+                }
                 
-                // Wall collision
-                if (circles[i].x - CIRCLE_RADIUS < FRAME_LEFT) {
-                    circles[i].x = FRAME_LEFT + CIRCLE_RADIUS;
-                    circles[i].vx = -circles[i].vx;
-                }
-                if (circles[i].x + CIRCLE_RADIUS > FRAME_RIGHT) {
-                    circles[i].x = FRAME_RIGHT - CIRCLE_RADIUS;
-                    circles[i].vx = -circles[i].vx;
-                }
-                if (circles[i].y - CIRCLE_RADIUS < FRAME_TOP) {
-                    circles[i].y = FRAME_TOP + CIRCLE_RADIUS;
-                    circles[i].vy = -circles[i].vy;
-                }
-                if (circles[i].y + CIRCLE_RADIUS > FRAME_BOTTOM) {
-                    circles[i].y = FRAME_BOTTOM - CIRCLE_RADIUS;
-                    circles[i].vy = -circles[i].vy;
-                }
+                // Draw circle with outline
+                DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, drawColor, TRUE);
+                DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, COLOR_BLACK, FALSE);
+                
+                // Draw HP number inside circle (centered)
+                DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].hp);
             }
             
-            // Handle player-player collision (only if both alive)
-           
-            if (circles[0].isAlive && circles[1].isAlive) {
-                if (HandlePlayerCollision(circles[0], circles[1])) {
-                    
-                    // やっぱプレイヤー同士の場合はヒットストップいらんかな。一旦コメント分にしておく
-                    // hitStopTimer = HIT_STOP_DURATION;
-                }
-            }
-            
-            // Check weapon hits (only if both alive)
-            if (circles[0].isAlive && circles[1].isAlive) {
-                // Check if yellow's weapon hits cyan
-                bool yellowHitsCyan = CheckWeaponHit(circles[0], circles[1]);
-                if (yellowHitsCyan) {
-                    // Apply damage only if cooldown expired and we had separation
-                    if (circles[1].hitCooldown <= 0.0f && !circles[1].wasHitLastFrame) {
-                        circles[1].hitTimer = HIT_FEEDBACK_DURATION;
-                        circles[1].hp -= WEAPON_DAMAGE;
-                        if (circles[1].hp <= 0) {
-                            circles[1].isAlive = false;
-                        }
-                        circles[1].hitCooldown = HIT_COOLDOWN_DURATION;
-                        hitStopTimer = HIT_STOP_DURATION;
-                    }
-                    circles[1].wasHitLastFrame = true;
+            // Draw weapons at player positions with rotated offsets (only if alive)
+            for (int i = 0; i < 2; i++) {
+                if (!circles[i].isAlive) continue;
+                
+                // Calculate weapon world position
+                float weaponWorldX, weaponWorldY;
+                GetWeaponWorldPosition(circles[i], weaponWorldX, weaponWorldY);
+                
+                // Draw weapon using player's angle
+                if (circles[i].weapon.type == WEAPON_BOOMERANG) {
+                    DrawBoomerang(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.color);
                 } else {
-                    circles[1].wasHitLastFrame = false;
+                    DrawSpear(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.color);
                 }
-                
-                // Check if cyan's weapon hits yellow
-                bool cyanHitsYellow = CheckWeaponHit(circles[1], circles[0]);
-                if (cyanHitsYellow) {
-                    // Apply damage only if cooldown expired and we had separation
-                    if (circles[0].hitCooldown <= 0.0f && !circles[0].wasHitLastFrame) {
-                        circles[0].hitTimer = HIT_FEEDBACK_DURATION;
-                        circles[0].hp -= WEAPON_DAMAGE;
-                        if (circles[0].hp <= 0) {
-                            circles[0].isAlive = false;
-                        }
-                        circles[0].hitCooldown = HIT_COOLDOWN_DURATION;
-                        hitStopTimer = HIT_STOP_DURATION;
-                    }
-                    circles[0].wasHitLastFrame = true;
+            }
+            
+            // Draw K.O. text for dead players
+            for (int i = 0; i < 2; i++) {
+                if (!circles[i].isAlive) {
+                    DrawFormatString((int)(circles[i].x + KO_TEXT_X_OFFSET), (int)(circles[i].y + KO_TEXT_Y_OFFSET), COLOR_BLACK, "K.O.");
+                }
+            }
+            
+            // Draw battle result
+            if (battleEnded) {
+                if (playerWon) {
+                    DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Victory!");
+                    DrawFormatString(SCREEN_WIDTH / 2 - 80, TITLE_Y_POSITION + 20, COLOR_BLACK, "Press Enter/Space to continue");
                 } else {
-                    circles[0].wasHitLastFrame = false;
+                    DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Defeat!");
+                    DrawFormatString(SCREEN_WIDTH / 2 - 80, TITLE_Y_POSITION + 20, COLOR_BLACK, "Press Enter/Space to retry");
                 }
-            }
-            
-            // Handle weapon-weapon collision (only if both alive)
-            if (circles[0].isAlive && circles[1].isAlive) {
-                if (HandleWeaponCollision(circles[0], circles[1])) {
-                    hitStopTimer = HIT_STOP_DURATION;
-                }
-            }
-        }
-        
-        // Update hit timer (always, even during hit-stop)
-        for (int i = 0; i < 2; i++) {
-            if (circles[i].hitTimer > 0.0f) {
-                circles[i].hitTimer -= 1.0f;
-            }
-            if (circles[i].hitCooldown > 0.0f) {
-                circles[i].hitCooldown -= 1.0f;
-            }
-        }
-        
-        // Draw circles with hit feedback (only if alive)
-        for (int i = 0; i < 2; i++) {
-            if (!circles[i].isAlive) continue;
-            
-            unsigned int drawColor = circles[i].color;
-            
-            // Apply red flash if hit
-            if (circles[i].hitTimer > 0.0f) {
-                drawColor = COLOR_HIT_FEEDBACK;
-            }
-            
-            // Draw circle with outline
-            DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, drawColor, TRUE);
-            DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, COLOR_BLACK, FALSE);
-            
-            // Draw HP number inside circle (centered)
-            DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].hp);
-        }
-        
-        // Draw weapons at player positions with rotated offsets (only if alive)
-        for (int i = 0; i < 2; i++) {
-            if (!circles[i].isAlive) continue;
-            
-            // Calculate weapon world position
-            float weaponWorldX, weaponWorldY;
-            GetWeaponWorldPosition(circles[i], weaponWorldX, weaponWorldY);
-            
-            // Draw weapon using player's angle
-            if (circles[i].weapon.type == WEAPON_BOOMERANG) {
-                DrawBoomerang(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.color);
             } else {
-                DrawSpear(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.color);
+                // Draw title text at top
+                const char* nodeTypeName = GetNodeTypeName(mapNodes[currentNodeIndex].type);
+                DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Battle: %s", nodeTypeName);
             }
         }
-        
-        // Draw K.O. text for dead players
-        for (int i = 0; i < 2; i++) {
-            if (!circles[i].isAlive) {
-                DrawFormatString((int)(circles[i].x + KO_TEXT_X_OFFSET), (int)(circles[i].y + KO_TEXT_Y_OFFSET), COLOR_BLACK, "K.O.");
-            }
-        }
-        
-        // Draw title text at top
-        DrawFormatString(SCREEN_WIDTH / 2 + TITLE_X_OFFSET, TITLE_Y_POSITION, COLOR_BLACK, "");
-        
-        // Draw stats at bottom
-        DrawFormatString(FRAME_LEFT, FRAME_BOTTOM + STATS_Y_OFFSET, COLOR_YELLOW, "Throw Damage: ");
-        DrawFormatString(FRAME_RIGHT + STATS_RIGHT_X_OFFSET, FRAME_BOTTOM + STATS_Y_OFFSET, COLOR_CYAN, "Damage/Length:");
         
         ScreenFlip();
     }
