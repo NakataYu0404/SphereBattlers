@@ -45,6 +45,10 @@ const int KO_TEXT_Y_OFFSET = -10;
 const int MAP_ROWS = 7;
 const int MAP_MAX_NODES_PER_ROW = 4;
 const float MAP_NODE_RADIUS = 20.0f;
+const float MAP_LEFT = 100.0f;
+const float MAP_RIGHT = 500.0f;
+const float MAP_TOP = 100.0f;
+const float MAP_BOTTOM = 650.0f;
 const unsigned int COLOR_RED = 0xFF0000;
 const unsigned int COLOR_GREEN = 0x00FF00;
 const unsigned int COLOR_BLUE = 0x0000FF;
@@ -457,6 +461,7 @@ std::vector<MapNode> GenerateMap() {
     nodes.push_back(bossNode);
     
     // Connect nodes (roughly 2 edges upward per node on average)
+    // First pass: random connections
     for (int row = 0; row < MAP_ROWS - 1; row++) {
         for (int idx : rowNodes[row]) {
             int nextRowSize = (int)rowNodes[row + 1].size();
@@ -476,12 +481,32 @@ std::vector<MapNode> GenerateMap() {
         }
     }
     
+    // Second pass: ensure all nodes in next row are reachable
+    for (int row = 1; row < MAP_ROWS; row++) {
+        for (int nextIdx : rowNodes[row]) {
+            // Check if this node is reachable from any node in previous row
+            bool isReachable = false;
+            for (int prevIdx : rowNodes[row - 1]) {
+                for (int connectedIdx : nodes[prevIdx].connectedNodes) {
+                    if (connectedIdx == nextIdx) {
+                        isReachable = true;
+                        break;
+                    }
+                }
+                if (isReachable) break;
+            }
+            
+            // If not reachable, connect from a random node in previous row
+            if (!isReachable && !rowNodes[row - 1].empty()) {
+                std::uniform_int_distribution<> prevDist(0, (int)rowNodes[row - 1].size() - 1);
+                int prevIdx = rowNodes[row - 1][prevDist(gen)];
+                nodes[prevIdx].connectedNodes.push_back(nextIdx);
+            }
+        }
+    }
+    
     // Calculate node positions for display
-    const float mapLeft = 100.0f;
-    const float mapRight = 500.0f;
-    const float mapTop = 100.0f;
-    const float mapBottom = 650.0f;
-    const float rowSpacing = (mapBottom - mapTop) / (MAP_ROWS - 1);
+    const float rowSpacing = (MAP_BOTTOM - MAP_TOP) / (MAP_ROWS - 1);
     
     for (size_t i = 0; i < nodes.size(); i++) {
         int row = nodes[i].row;
@@ -494,11 +519,11 @@ std::vector<MapNode> GenerateMap() {
             }
         }
         
-        float rowWidth = mapRight - mapLeft;
+        float rowWidth = MAP_RIGHT - MAP_LEFT;
         float nodeSpacing = (numNodesInRow > 1) ? rowWidth / (numNodesInRow - 1) : 0.0f;
         
-        nodes[i].x = mapLeft + (numNodesInRow > 1 ? colIndex * nodeSpacing : rowWidth * 0.5f);
-        nodes[i].y = mapBottom - row * rowSpacing;  // Invert so row 0 is at bottom
+        nodes[i].x = MAP_LEFT + (numNodesInRow > 1 ? colIndex * nodeSpacing : rowWidth * 0.5f);
+        nodes[i].y = MAP_BOTTOM - row * rowSpacing;  // Invert so row 0 is at bottom
     }
     
     return nodes;
@@ -562,6 +587,71 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     // Draw instructions
     DrawFormatString(10, SCREEN_HEIGHT - 60, COLOR_BLACK, "Mouse: Click | Keys: Arrow/WASD + Enter/Space");
     DrawFormatString(10, SCREEN_HEIGHT - 40, COLOR_BLACK, "ESC: Quit");
+}
+
+// Update reachability after selecting a node
+void UpdateReachability(std::vector<MapNode>& mapNodes, int currentNodeIndex) {
+    // Clear all reachability
+    for (size_t i = 0; i < mapNodes.size(); i++) {
+        mapNodes[i].reachable = false;
+    }
+    // Set connected nodes as reachable
+    for (int connectedIdx : mapNodes[currentNodeIndex].connectedNodes) {
+        mapNodes[connectedIdx].reachable = true;
+    }
+}
+
+// Initialize battle characters
+void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar, 
+                      NodeType nodeType, const std::vector<MapNode>& mapNodes, int currentNodeIndex) {
+    // Initialize player
+    player = playerChar;
+    player.x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
+    player.y = FRAME_BOTTOM - 80.0f;
+    player.hitTimer = 0.0f;
+    player.isAlive = true;
+    player.hitCooldown = 0.0f;
+    player.wasHitLastFrame = false;
+    
+    // Initialize enemy
+    enemy.x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
+    enemy.y = FRAME_BOTTOM - 80.0f;
+    enemy.angle = 0.0f;
+    enemy.number = 91;
+    enemy.hitTimer = 0.0f;
+    enemy.isAlive = true;
+    enemy.hitCooldown = 0.0f;
+    enemy.wasHitLastFrame = false;
+    
+    // Set enemy parameters based on node type
+    if (nodeType == NODE_BOSS) {
+        // Try to load boss from JSON
+        if (!LoadBossFromJSON(enemy)) {
+            // Default boss
+            enemy.vx = -2.0f;
+            enemy.vy = -3.5f;
+            enemy.angularVel = -0.025f;
+            enemy.color = COLOR_CYAN;
+            enemy.hp = MAX_HP;
+            enemy.weapon.type = WEAPON_SPEAR;
+            enemy.weapon.offsetX = 45.0f;
+            enemy.weapon.offsetY = 0.0f;
+            enemy.weapon.length = 30.0f;
+            enemy.weapon.color = COLOR_CYAN;
+        }
+    } else {
+        // Regular/elite enemy (for now, same as default)
+        enemy.vx = -2.0f;
+        enemy.vy = -3.5f;
+        enemy.angularVel = -0.025f;
+        enemy.color = COLOR_CYAN;
+        enemy.hp = MAX_HP;
+        enemy.weapon.type = WEAPON_SPEAR;
+        enemy.weapon.offsetX = 45.0f;
+        enemy.weapon.offsetY = 0.0f;
+        enemy.weapon.length = 30.0f;
+        enemy.weapon.color = COLOR_CYAN;
+    }
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -706,12 +796,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         mapNodes[currentNodeIndex].visited = true;
                         
                         // Update reachability
-                        for (size_t i = 0; i < mapNodes.size(); i++) {
-                            mapNodes[i].reachable = false;
-                        }
-                        for (int connectedIdx : mapNodes[currentNodeIndex].connectedNodes) {
-                            mapNodes[connectedIdx].reachable = true;
-                        }
+                        UpdateReachability(mapNodes, currentNodeIndex);
                         
                         // Enter battle scene based on node type
                         if (mapNodes[currentNodeIndex].type == NODE_NORMAL || 
@@ -720,53 +805,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             currentScene = SCENE_BATTLE;
                             
                             // Initialize battle
-                            // Player (yellow)
-                            circles[0] = playerChar;
-                            circles[0].x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
-                            circles[0].y = FRAME_BOTTOM - 80.0f;
-                            circles[0].hitTimer = 0.0f;
-                            circles[0].isAlive = true;
-                            circles[0].hitCooldown = 0.0f;
-                            circles[0].wasHitLastFrame = false;
-                            
-                            // Enemy (cyan) - boss or regular
-                            circles[1].x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
-                            circles[1].y = FRAME_BOTTOM - 80.0f;
-                            circles[1].angle = 0.0f;
-                            circles[1].number = 91;
-                            circles[1].hitTimer = 0.0f;
-                            circles[1].isAlive = true;
-                            circles[1].hitCooldown = 0.0f;
-                            circles[1].wasHitLastFrame = false;
-                            
-                            if (mapNodes[currentNodeIndex].type == NODE_BOSS) {
-                                // Try to load boss from JSON
-                                if (!LoadBossFromJSON(circles[1])) {
-                                    // Default boss
-                                    circles[1].vx = -2.0f;
-                                    circles[1].vy = -3.5f;
-                                    circles[1].angularVel = -0.025f;
-                                    circles[1].color = COLOR_CYAN;
-                                    circles[1].hp = MAX_HP;
-                                    circles[1].weapon.type = WEAPON_SPEAR;
-                                    circles[1].weapon.offsetX = 45.0f;
-                                    circles[1].weapon.offsetY = 0.0f;
-                                    circles[1].weapon.length = 30.0f;
-                                    circles[1].weapon.color = COLOR_CYAN;
-                                }
-                            } else {
-                                // Regular/elite enemy (for now, same as default)
-                                circles[1].vx = -2.0f;
-                                circles[1].vy = -3.5f;
-                                circles[1].angularVel = -0.025f;
-                                circles[1].color = COLOR_CYAN;
-                                circles[1].hp = MAX_HP;
-                                circles[1].weapon.type = WEAPON_SPEAR;
-                                circles[1].weapon.offsetX = 45.0f;
-                                circles[1].weapon.offsetY = 0.0f;
-                                circles[1].weapon.length = 30.0f;
-                                circles[1].weapon.color = COLOR_CYAN;
-                            }
+                            InitializeBattle(circles[0], circles[1], playerChar, 
+                                           mapNodes[currentNodeIndex].type, mapNodes, currentNodeIndex);
                             
                             hitStopTimer = 0.0f;
                             battleEnded = false;
@@ -789,12 +829,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     mapNodes[currentNodeIndex].visited = true;
                     
                     // Update reachability
-                    for (size_t i = 0; i < mapNodes.size(); i++) {
-                        mapNodes[i].reachable = false;
-                    }
-                    for (int connectedIdx : mapNodes[currentNodeIndex].connectedNodes) {
-                        mapNodes[connectedIdx].reachable = true;
-                    }
+                    UpdateReachability(mapNodes, currentNodeIndex);
                     
                     // Enter battle scene
                     if (mapNodes[currentNodeIndex].type == NODE_NORMAL || 
@@ -802,49 +837,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         mapNodes[currentNodeIndex].type == NODE_BOSS) {
                         currentScene = SCENE_BATTLE;
                         
-                        // Initialize battle (same as keyboard selection above)
-                        circles[0] = playerChar;
-                        circles[0].x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
-                        circles[0].y = FRAME_BOTTOM - 80.0f;
-                        circles[0].hitTimer = 0.0f;
-                        circles[0].isAlive = true;
-                        circles[0].hitCooldown = 0.0f;
-                        circles[0].wasHitLastFrame = false;
-                        
-                        circles[1].x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
-                        circles[1].y = FRAME_BOTTOM - 80.0f;
-                        circles[1].angle = 0.0f;
-                        circles[1].number = 91;
-                        circles[1].hitTimer = 0.0f;
-                        circles[1].isAlive = true;
-                        circles[1].hitCooldown = 0.0f;
-                        circles[1].wasHitLastFrame = false;
-                        
-                        if (mapNodes[currentNodeIndex].type == NODE_BOSS) {
-                            if (!LoadBossFromJSON(circles[1])) {
-                                circles[1].vx = -2.0f;
-                                circles[1].vy = -3.5f;
-                                circles[1].angularVel = -0.025f;
-                                circles[1].color = COLOR_CYAN;
-                                circles[1].hp = MAX_HP;
-                                circles[1].weapon.type = WEAPON_SPEAR;
-                                circles[1].weapon.offsetX = 45.0f;
-                                circles[1].weapon.offsetY = 0.0f;
-                                circles[1].weapon.length = 30.0f;
-                                circles[1].weapon.color = COLOR_CYAN;
-                            }
-                        } else {
-                            circles[1].vx = -2.0f;
-                            circles[1].vy = -3.5f;
-                            circles[1].angularVel = -0.025f;
-                            circles[1].color = COLOR_CYAN;
-                            circles[1].hp = MAX_HP;
-                            circles[1].weapon.type = WEAPON_SPEAR;
-                            circles[1].weapon.offsetX = 45.0f;
-                            circles[1].weapon.offsetY = 0.0f;
-                            circles[1].weapon.length = 30.0f;
-                            circles[1].weapon.color = COLOR_CYAN;
-                        }
+                        // Initialize battle
+                        InitializeBattle(circles[0], circles[1], playerChar, 
+                                       mapNodes[currentNodeIndex].type, mapNodes, currentNodeIndex);
                         
                         hitStopTimer = 0.0f;
                         battleEnded = false;
