@@ -1,9 +1,16 @@
 #include <DxLib.h>
+
+// windows.h Ç™ min/max É}ÉNÉçÇíËã`ÇµÇƒ std::min/std::max Ç∆è’ìÀÇ∑ÇÈÇÃÇñhÇÆ
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <windows.h>
 #include <cmath>
 #include <vector>
 #include <random>
 #include <fstream>
+#include <algorithm>
 #include "Library/nlohmann/json.hpp"
 
 using json = nlohmann::json;
@@ -486,7 +493,8 @@ std::vector<MapNode> GenerateMap() {
             if (nextRowSize == 0) continue;
             
             // Each node connects to 1-3 nodes in next row (average 2)
-            std::uniform_int_distribution<> connDist(1, std::min(3, nextRowSize));
+            int maxConnections = (nextRowSize < 3) ? nextRowSize : 3;
+            std::uniform_int_distribution<int> connDist(1, maxConnections);
             int numConnections = connDist(gen);
             
             // Randomly select nodes to connect to
@@ -717,7 +725,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     playerChar.number = 92;
     playerChar.color = COLOR_YELLOW;
     playerChar.hp = MAX_HP;
-    playerChar.weapon.type = WEAPON_BOOMERANG;
+    playerChar.weapon.type = WEAPON_SPEAR;
     playerChar.weapon.offsetX = 40.0f;
     playerChar.weapon.offsetY = 0.0f;
     playerChar.weapon.length = 25.0f;
