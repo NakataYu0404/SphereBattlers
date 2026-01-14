@@ -22,6 +22,7 @@ const int MAX_HP = 100;
 const int WEAPON_DAMAGE = 10;
 const float HIT_STOP_DURATION = 10.0f;  // ~100ms at 60fps (frames)
 const float WEAPON_COLLISION_THRESHOLD = 5.0f;  // Distance threshold for weapon-weapon collision
+const float WEAPON_BOUNCE_DAMPING = 0.8f;  // Damping factor for weapon bounce
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
@@ -30,6 +31,10 @@ const int STATS_Y_OFFSET = 30;
 const int STATS_RIGHT_X_OFFSET = -150;
 const int CIRCLE_NUMBER_X_OFFSET = -10;
 const int CIRCLE_NUMBER_Y_OFFSET = -8;
+const int HP_TEXT_X_OFFSET = -15;
+const int HP_TEXT_Y_OFFSET = -45;
+const int KO_TEXT_X_OFFSET = -20;
+const int KO_TEXT_Y_OFFSET = -10;
 
 // Weapon type enum
 enum WeaponType {
@@ -246,8 +251,8 @@ bool HandleWeaponCollision(Circle& c1, Circle& c2) {
     
     if (dist < WEAPON_COLLISION_THRESHOLD) {
         // Simple bounce: reverse angular velocities to make weapons separate
-        c1.angularVel = -c1.angularVel * 0.8f;
-        c2.angularVel = -c2.angularVel * 0.8f;
+        c1.angularVel = -c1.angularVel * WEAPON_BOUNCE_DAMPING;
+        c2.angularVel = -c2.angularVel * WEAPON_BOUNCE_DAMPING;
         
         return true;  // Collision occurred
     }
@@ -422,7 +427,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].number);
             
             // Draw HP near player
-            DrawFormatString((int)(circles[i].x - 15), (int)(circles[i].y - 45), COLOR_BLACK, "HP:%d", circles[i].hp);
+            DrawFormatString((int)(circles[i].x + HP_TEXT_X_OFFSET), (int)(circles[i].y + HP_TEXT_Y_OFFSET), COLOR_BLACK, "HP:%d", circles[i].hp);
         }
         
         // Draw weapons at player positions with rotated offsets (only if alive)
@@ -444,7 +449,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // Draw K.O. text for dead players
         for (int i = 0; i < 2; i++) {
             if (!circles[i].isAlive) {
-                DrawFormatString((int)(circles[i].x - 20), (int)(circles[i].y - 10), COLOR_BLACK, "K.O.");
+                DrawFormatString((int)(circles[i].x + KO_TEXT_X_OFFSET), (int)(circles[i].y + KO_TEXT_Y_OFFSET), COLOR_BLACK, "K.O.");
             }
         }
         
