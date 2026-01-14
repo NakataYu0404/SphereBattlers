@@ -1,6 +1,6 @@
 #include <DxLib.h>
 
-// windows.h ‚ª min/max ƒ}ƒNƒ‚ð’è‹`‚µ‚Ä std::min/std::max ‚ÆÕ“Ë‚·‚é‚Ì‚ð–h‚®
+// windows.h ï¿½ï¿½ min/max ï¿½}ï¿½Nï¿½ï¿½ï¿½ï¿½ï¿½`ï¿½ï¿½ï¿½ï¿½ std::min/std::max ï¿½ÆÕ“Ë‚ï¿½ï¿½ï¿½Ì‚ï¿½hï¿½ï¿½
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -738,6 +738,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int keyPressDelay = 0;
     const int KEY_PRESS_COOLDOWN = 10;
     
+    // Input cooldown for map scene after battle return
+    float mapInputCooldown = 0.0f;
+    const float MAP_INPUT_COOLDOWN_DURATION = 10.0f;  // ~0.167s at 60fps
+    
+    // Keyboard state tracking for edge detection
+    bool prevEnterKeyState = false;
+    bool prevSpaceKeyState = false;
+    
     // Main loop
     while (ProcessMessage() == 0) {
         // Check for ESC key to exit
@@ -751,6 +759,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         
         if (currentScene == SCENE_MAP) {
             // ===== MAP SCENE =====
+            
+            // Update input cooldown timer
+            if (mapInputCooldown > 0.0f) {
+                mapInputCooldown -= 1.0f;
+            }
             
             // Update highlighted node based on mouse position
             int mouseX, mouseY;
@@ -815,8 +828,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         keyPressDelay = KEY_PRESS_COOLDOWN;
                     }
                     
-                    // Enter or Space to select
-                    if ((CheckHitKey(KEY_INPUT_RETURN) || CheckHitKey(KEY_INPUT_SPACE)) && highlightedNodeIndex >= 0) {
+                    // Enter or Space to select (with edge detection and cooldown)
+                    bool currentEnterKeyState = CheckHitKey(KEY_INPUT_RETURN) != 0;
+                    bool currentSpaceKeyState = CheckHitKey(KEY_INPUT_SPACE) != 0;
+                    bool enterPressed = currentEnterKeyState && !prevEnterKeyState;
+                    bool spacePressed = currentSpaceKeyState && !prevSpaceKeyState;
+                    prevEnterKeyState = currentEnterKeyState;
+                    prevSpaceKeyState = currentSpaceKeyState;
+                    
+                    if ((enterPressed || spacePressed) && highlightedNodeIndex >= 0 && mapInputCooldown <= 0.0f) {
                         // Select this node
                         currentNodeIndex = highlightedNodeIndex;
                         mapNodes[currentNodeIndex].visited = true;
@@ -846,9 +866,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
             }
             
-            // Mouse click to select node
+            // Mouse click to select node (with cooldown)
             int mouseState = GetMouseInput();
-            if ((mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT)) {
+            if ((mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT) && mapInputCooldown <= 0.0f) {
                 // Mouse clicked
                 if (highlightedNodeIndex >= 0 && mapNodes[highlightedNodeIndex].reachable && !mapNodes[highlightedNodeIndex].visited) {
                     currentNodeIndex = highlightedNodeIndex;
@@ -989,7 +1009,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
             } else {
                 // Battle ended - wait for input to return to map
-                if (CheckHitKey(KEY_INPUT_RETURN) || CheckHitKey(KEY_INPUT_SPACE)) {
+                bool currentEnterKeyState = CheckHitKey(KEY_INPUT_RETURN) != 0;
+                bool currentSpaceKeyState = CheckHitKey(KEY_INPUT_SPACE) != 0;
+                bool enterPressed = currentEnterKeyState && !prevEnterKeyState;
+                bool spacePressed = currentSpaceKeyState && !prevSpaceKeyState;
+                prevEnterKeyState = currentEnterKeyState;
+                prevSpaceKeyState = currentSpaceKeyState;
+                
+                if (enterPressed || spacePressed) {
                     if (playerWon) {
                         // Update player character state
                         playerChar.hp = circles[0].hp;
@@ -1018,6 +1045,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             playerChar.hp = MAX_HP;
                         }
                         
+                        // Set input cooldown and clear input state before returning to map
+                        mapInputCooldown = MAP_INPUT_COOLDOWN_DURATION;
+                        prevEnterKeyState = true;  // Prevent immediate re-trigger
+                        prevSpaceKeyState = true;
                         currentScene = SCENE_MAP;
                     } else {
                         // Player lost - restart from beginning
@@ -1031,6 +1062,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         
                         // Reset player
                         playerChar.hp = MAX_HP;
+                        
+                        // Set input cooldown and clear input state before returning to map
+                        mapInputCooldown = MAP_INPUT_COOLDOWN_DURATION;
+                        prevEnterKeyState = true;  // Prevent immediate re-trigger
+                        prevSpaceKeyState = true;
                         currentScene = SCENE_MAP;
                     }
                 }
