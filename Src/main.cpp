@@ -19,7 +19,11 @@ const unsigned int COLOR_BLACK = 0x000000;
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
+const int TITLE_Y_POSITION = 30;
+const int STATS_Y_OFFSET = 30;
 const int STATS_RIGHT_X_OFFSET = -150;
+const int CIRCLE_NUMBER_X_OFFSET = -10;
+const int CIRCLE_NUMBER_Y_OFFSET = -8;
 
 // Circle struct
 struct Circle {
@@ -169,12 +173,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 circles[i].vy = -circles[i].vy;
             }
             
-            // Draw circle
+            // Draw circle with outline
             DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, circles[i].color, TRUE);
             DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, COLOR_BLACK, FALSE);
             
             // Draw number on circle
-            DrawFormatString((int)(circles[i].x - 10), (int)(circles[i].y - 8), COLOR_BLACK, "%d", circles[i].number);
+            DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].number);
         }
         
         // Update and draw weapons
@@ -185,11 +189,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DrawSpear(spear.x, spear.y, spear.angle, COLOR_CYAN);
         
         // Draw title text at top
-        DrawFormatString(SCREEN_WIDTH / 2 + TITLE_X_OFFSET, 30, COLOR_BLACK, "Boomerang VS Spear");
+        DrawFormatString(SCREEN_WIDTH / 2 + TITLE_X_OFFSET, TITLE_Y_POSITION, COLOR_BLACK, "Boomerang VS Spear");
         
         // Draw stats at bottom
-        DrawFormatString(FRAME_LEFT, FRAME_BOTTOM + 30, COLOR_YELLOW, "Throw Damage: 13");
-        DrawFormatString(FRAME_RIGHT + STATS_RIGHT_X_OFFSET, FRAME_BOTTOM + 30, COLOR_CYAN, "Damage/Length: 3.5");
+        DrawFormatString(FRAME_LEFT, FRAME_BOTTOM + STATS_Y_OFFSET, COLOR_YELLOW, "Throw Damage: 13");
+        DrawFormatString(FRAME_RIGHT + STATS_RIGHT_X_OFFSET, FRAME_BOTTOM + STATS_Y_OFFSET, COLOR_CYAN, "Damage/Length: 3.5");
         
         ScreenFlip();
     }
