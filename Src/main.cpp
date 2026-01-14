@@ -75,7 +75,8 @@ const char* BOSS_SAVE_FILE = "boss_save.json";
 // Scene enum
 enum Scene {
     SCENE_MAP,
-    SCENE_BATTLE
+    SCENE_BATTLE,
+    SCENE_REWARD
 };
 
 // Node type enum
@@ -125,15 +126,18 @@ struct Circle {
     unsigned int color;
     WeaponDef weapon;
     float hitTimer;     // Timer for hit feedback (counts down)
-    int hp;             // Hit points (100 max)
+    int hp;             // Hit points (current)
+    int maxHP;          // Maximum hit points
+    int weaponDamage;   // Weapon damage modifier
+    float baseSpeed;    // Base movement speed
     bool isAlive;       // Whether player is alive
     float hitCooldown;  // Cooldown timer before can be hit again (counts down)
     bool wasHitLastFrame;  // Track if was being hit last frame (for separation detection)
 };
 
 // Helper function to clamp HP to valid range
-int ClampHP(int hp) {
-    return (hp > MAX_HP) ? MAX_HP : ((hp < 0) ? 0 : hp);
+int ClampHP(int hp, int maxHP) {
+    return (hp > maxHP) ? maxHP : ((hp < 0) ? 0 : hp);
 }
 
 // Helper function to detect key press edge (new press only, not held)
@@ -157,8 +161,8 @@ void ResetMapInputState(float& cooldown, bool& prevEnter, bool& prevSpace) {
 void SaveBossToJSON(const Circle& player) {
     try {
         json j;
-        j["hp"] = ClampHP(player.hp);
-        j["maxHP"] = MAX_HP;
+        j["hp"] = ClampHP(player.hp, player.maxHP);
+        j["maxHP"] = player.maxHP;
         j["vx"] = player.vx;
         j["vy"] = player.vy;
         j["angularVel"] = player.angularVel;
@@ -192,8 +196,10 @@ bool LoadBossFromJSON(Circle& boss) {
         file.close();
         
         // Load boss parameters with clamping and validation
+        int loadedMaxHP = j.value("maxHP", MAX_HP);
         int loadedHP = j.value("hp", MAX_HP);
-        boss.hp = ClampHP(loadedHP);
+        boss.maxHP = loadedMaxHP;
+        boss.hp = ClampHP(loadedHP, loadedMaxHP);
         boss.vx = j.value("vx", -2.0f);
         boss.vy = j.value("vy", -3.5f);
         boss.angularVel = j.value("angularVel", -0.025f);
@@ -666,6 +672,9 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
     enemy.isAlive = true;
     enemy.hitCooldown = 0.0f;
     enemy.wasHitLastFrame = false;
+    enemy.maxHP = MAX_HP;
+    enemy.weaponDamage = 0;
+    enemy.baseSpeed = 1.0f;
     
     // Set enemy parameters based on node type
     if (nodeType == NODE_BOSS) {
@@ -748,6 +757,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     playerChar.weapon.offsetY = 0.0f;
     playerChar.weapon.length = 25.0f;
     playerChar.weapon.color = COLOR_YELLOW;
+    playerChar.maxHP = MAX_HP;
+    playerChar.weaponDamage = 0;
+    playerChar.baseSpeed = 1.0f;
     
     // Mouse state tracking
     int prevMouseState = 0;
@@ -968,7 +980,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             // Apply damage only if cooldown expired and we had separation
                             if (circles[1].hitCooldown <= 0.0f && !circles[1].wasHitLastFrame) {
                                 circles[1].hitTimer = HIT_FEEDBACK_DURATION;
-                                circles[1].hp -= WEAPON_DAMAGE;
+                                int damage = WEAPON_DAMAGE + circles[0].weaponDamage;
+                                circles[1].hp -= damage;
                                 if (circles[1].hp <= 0) {
                                     circles[1].isAlive = false;
                                     battleEnded = true;
@@ -988,7 +1001,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             // Apply damage only if cooldown expired and we had separation
                             if (circles[0].hitCooldown <= 0.0f && !circles[0].wasHitLastFrame) {
                                 circles[0].hitTimer = HIT_FEEDBACK_DURATION;
-                                circles[0].hp -= WEAPON_DAMAGE;
+                                int damage = WEAPON_DAMAGE + circles[1].weaponDamage;
+                                circles[0].hp -= damage;
                                 if (circles[0].hp <= 0) {
                                     circles[0].isAlive = false;
                                     battleEnded = true;
@@ -1021,7 +1035,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     }
                 }
             } else {
-                // Battle ended - wait for input to return to map
+                // Battle ended - wait for input to continue
                 bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
                 bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
                 
@@ -1052,11 +1066,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             
                             // Reset player
                             playerChar.hp = MAX_HP;
+                            playerChar.maxHP = MAX_HP;
+                            playerChar.weaponDamage = 0;
+                            playerChar.baseSpeed = 1.0f;
+                            
+                            // Set input cooldown and clear input state before returning to map
+                            ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
+                            currentScene = SCENE_MAP;
+                        } else {
+                            // Transition to reward selection scene
+                            ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
+                            currentScene = SCENE_REWARD;
                         }
-                        
-                        // Set input cooldown and clear input state before returning to map
-                        ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
-                        currentScene = SCENE_MAP;
                     } else {
                         // Player lost - restart from beginning
                         mapNodes = GenerateMap();
@@ -1069,6 +1090,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         
                         // Reset player
                         playerChar.hp = MAX_HP;
+                        playerChar.maxHP = MAX_HP;
+                        playerChar.weaponDamage = 0;
+                        playerChar.baseSpeed = 1.0f;
                         
                         // Set input cooldown and clear input state before returning to map
                         ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
@@ -1133,6 +1157,127 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 const char* nodeTypeName = GetNodeTypeName(mapNodes[currentNodeIndex].type);
                 DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Battle: %s", nodeTypeName);
             }
+        } else if (currentScene == SCENE_REWARD) {
+            // ===== REWARD SELECTION SCENE =====
+            
+            // Reward selection state (persistent across frames in this scene)
+            static int selectedReward = 0;  // 0 = HP, 1 = Attack, 2 = Speed
+            static bool rewardSceneInitialized = false;
+            
+            // Initialize reward scene on first entry
+            if (!rewardSceneInitialized) {
+                selectedReward = 0;
+                rewardSceneInitialized = true;
+            }
+            
+            // Update input cooldown timer
+            if (mapInputCooldown > 0.0f) {
+                mapInputCooldown -= 1.0f;
+            }
+            
+            // Define reward option rectangles
+            const int REWARD_BOX_WIDTH = 160;
+            const int REWARD_BOX_HEIGHT = 100;
+            const int REWARD_SPACING = 20;
+            const int REWARD_START_X = (SCREEN_WIDTH - (REWARD_BOX_WIDTH * 3 + REWARD_SPACING * 2)) / 2;
+            const int REWARD_Y = 250;
+            
+            // Handle keyboard navigation (Left/Right)
+            if (keyPressDelay > 0) {
+                keyPressDelay--;
+            }
+            
+            if (keyPressDelay == 0) {
+                bool moveLeft = CheckHitKey(KEY_INPUT_LEFT) || CheckHitKey(KEY_INPUT_A);
+                bool moveRight = CheckHitKey(KEY_INPUT_RIGHT) || CheckHitKey(KEY_INPUT_D);
+                
+                if (moveLeft) {
+                    selectedReward = (selectedReward - 1 + 3) % 3;
+                    keyPressDelay = KEY_PRESS_COOLDOWN;
+                } else if (moveRight) {
+                    selectedReward = (selectedReward + 1) % 3;
+                    keyPressDelay = KEY_PRESS_COOLDOWN;
+                }
+            }
+            
+            // Handle mouse hover
+            int mouseX, mouseY;
+            GetMousePoint(&mouseX, &mouseY);
+            
+            for (int i = 0; i < 3; i++) {
+                int boxX = REWARD_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
+                int boxY = REWARD_Y;
+                
+                if (mouseX >= boxX && mouseX <= boxX + REWARD_BOX_WIDTH &&
+                    mouseY >= boxY && mouseY <= boxY + REWARD_BOX_HEIGHT) {
+                    selectedReward = i;
+                }
+            }
+            
+            // Handle selection (Enter/Space or mouse click)
+            bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
+            bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
+            int mouseState = GetMouseInput();
+            bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
+            
+            if ((enterPressed || spacePressed || mouseClicked) && mapInputCooldown <= 0.0f) {
+                // Apply selected reward
+                if (selectedReward == 0) {
+                    // Max HP +10 (no healing)
+                    playerChar.maxHP += 10;
+                } else if (selectedReward == 1) {
+                    // Attack +1 (weapon damage +1)
+                    playerChar.weaponDamage += 1;
+                } else if (selectedReward == 2) {
+                    // Speed +0.1
+                    float oldSpeed = playerChar.baseSpeed;
+                    playerChar.baseSpeed += 0.1f;
+                    // Apply proportionally to current velocity
+                    float speedMult = playerChar.baseSpeed / oldSpeed;
+                    playerChar.vx *= speedMult;
+                    playerChar.vy *= speedMult;
+                }
+                
+                // Reset reward scene for next time
+                rewardSceneInitialized = false;
+                
+                // Set input cooldown and clear input state before returning to map
+                ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState);
+                currentScene = SCENE_MAP;
+            }
+            
+            prevMouseState = mouseState;
+            
+            // Draw reward selection UI
+            DrawFormatString(SCREEN_WIDTH / 2 - 80, 150, COLOR_BLACK, "Select Your Reward!");
+            
+            for (int i = 0; i < 3; i++) {
+                int boxX = REWARD_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
+                int boxY = REWARD_Y;
+                
+                // Draw box background
+                unsigned int boxColor = (i == selectedReward) ? COLOR_YELLOW : COLOR_WHITE;
+                DrawBox(boxX, boxY, boxX + REWARD_BOX_WIDTH, boxY + REWARD_BOX_HEIGHT, boxColor, TRUE);
+                DrawBox(boxX, boxY, boxX + REWARD_BOX_WIDTH, boxY + REWARD_BOX_HEIGHT, COLOR_BLACK, FALSE);
+                
+                // Draw reward text
+                if (i == 0) {
+                    DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +10");
+                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(No healing)");
+                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Current: %d", playerChar.maxHP);
+                } else if (i == 1) {
+                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +1");
+                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Weapon dmg)");
+                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Current: %d", WEAPON_DAMAGE + playerChar.weaponDamage);
+                } else if (i == 2) {
+                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Speed +0.1");
+                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Movement)");
+                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Current: %.1f", playerChar.baseSpeed);
+                }
+            }
+            
+            // Draw instructions
+            DrawFormatString(SCREEN_WIDTH / 2 - 120, 400, COLOR_BLACK, "Mouse: Click | Keys: Left/Right + Enter/Space");
         }
         
         ScreenFlip();
