@@ -23,6 +23,7 @@ const int WEAPON_DAMAGE = 10;
 const float HIT_STOP_DURATION = 10.0f;  // ~100ms at 60fps (frames)
 const float WEAPON_COLLISION_THRESHOLD = 5.0f;  // Distance threshold for weapon-weapon collision
 const float WEAPON_BOUNCE_DAMPING = 0.8f;  // Damping factor for weapon bounce
+const float HIT_COOLDOWN_DURATION = 24.0f;  // ~0.4s at 60fps (frames) - cooldown between hits
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
@@ -63,6 +64,8 @@ struct Circle {
     float hitTimer;     // Timer for hit feedback (counts down)
     int hp;             // Hit points (100 max)
     bool isAlive;       // Whether player is alive
+    float hitCooldown;  // Cooldown timer before can be hit again (counts down)
+    bool wasHitLastFrame;  // Track if was being hit last frame (for separation detection)
 };
 
 // Function to draw a boomerang
@@ -288,6 +291,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     circles[0].hitTimer = 0.0f;
     circles[0].hp = MAX_HP;
     circles[0].isAlive = true;
+    circles[0].hitCooldown = 0.0f;
+    circles[0].wasHitLastFrame = false;
     circles[0].weapon.type = WEAPON_BOOMERANG;
     circles[0].weapon.offsetX = 40.0f;  // Offset in local space
     circles[0].weapon.offsetY = 0.0f;
@@ -306,6 +311,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     circles[1].hitTimer = 0.0f;
     circles[1].hp = MAX_HP;
     circles[1].isAlive = true;
+    circles[1].hitCooldown = 0.0f;
+    circles[1].wasHitLastFrame = false;
     circles[1].weapon.type = WEAPON_SPEAR;
     circles[1].weapon.offsetX = 45.0f;  // Offset in local space
     circles[1].weapon.offsetY = 0.0f;
@@ -375,21 +382,40 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             // Check weapon hits (only if both alive)
             if (circles[0].isAlive && circles[1].isAlive) {
-                if (CheckWeaponHit(circles[0], circles[1])) {
-                    circles[1].hitTimer = HIT_FEEDBACK_DURATION;
-                    circles[1].hp -= WEAPON_DAMAGE;
-                    if (circles[1].hp <= 0) {
-                        circles[1].isAlive = false;
+                // Check if yellow's weapon hits cyan
+                bool yellowHitsCyan = CheckWeaponHit(circles[0], circles[1]);
+                if (yellowHitsCyan) {
+                    // Apply damage only if cooldown expired and we had separation
+                    if (circles[1].hitCooldown <= 0.0f && !circles[1].wasHitLastFrame) {
+                        circles[1].hitTimer = HIT_FEEDBACK_DURATION;
+                        circles[1].hp -= WEAPON_DAMAGE;
+                        if (circles[1].hp <= 0) {
+                            circles[1].isAlive = false;
+                        }
+                        circles[1].hitCooldown = HIT_COOLDOWN_DURATION;
+                        hitStopTimer = HIT_STOP_DURATION;
                     }
-                    hitStopTimer = HIT_STOP_DURATION;
+                    circles[1].wasHitLastFrame = true;
+                } else {
+                    circles[1].wasHitLastFrame = false;
                 }
-                if (CheckWeaponHit(circles[1], circles[0])) {
-                    circles[0].hitTimer = HIT_FEEDBACK_DURATION;
-                    circles[0].hp -= WEAPON_DAMAGE;
-                    if (circles[0].hp <= 0) {
-                        circles[0].isAlive = false;
+                
+                // Check if cyan's weapon hits yellow
+                bool cyanHitsYellow = CheckWeaponHit(circles[1], circles[0]);
+                if (cyanHitsYellow) {
+                    // Apply damage only if cooldown expired and we had separation
+                    if (circles[0].hitCooldown <= 0.0f && !circles[0].wasHitLastFrame) {
+                        circles[0].hitTimer = HIT_FEEDBACK_DURATION;
+                        circles[0].hp -= WEAPON_DAMAGE;
+                        if (circles[0].hp <= 0) {
+                            circles[0].isAlive = false;
+                        }
+                        circles[0].hitCooldown = HIT_COOLDOWN_DURATION;
+                        hitStopTimer = HIT_STOP_DURATION;
                     }
-                    hitStopTimer = HIT_STOP_DURATION;
+                    circles[0].wasHitLastFrame = true;
+                } else {
+                    circles[0].wasHitLastFrame = false;
                 }
             }
             
@@ -405,6 +431,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         for (int i = 0; i < 2; i++) {
             if (circles[i].hitTimer > 0.0f) {
                 circles[i].hitTimer -= 1.0f;
+            }
+            if (circles[i].hitCooldown > 0.0f) {
+                circles[i].hitCooldown -= 1.0f;
             }
         }
         
@@ -423,11 +452,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, drawColor, TRUE);
             DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, COLOR_BLACK, FALSE);
             
-            // Draw number on circle
-            DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].number);
-            
-            // Draw HP near player
-            DrawFormatString((int)(circles[i].x + HP_TEXT_X_OFFSET), (int)(circles[i].y + HP_TEXT_Y_OFFSET), COLOR_BLACK, "HP:%d", circles[i].hp);
+            // Draw HP number inside circle (centered)
+            DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].hp);
         }
         
         // Draw weapons at player positions with rotated offsets (only if alive)
