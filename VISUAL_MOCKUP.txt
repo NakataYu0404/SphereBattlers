@@ -1,0 +1,93 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                   BOOMERANG VS SPEAR DEMO                      ║
+║                     Expected Visual Output                     ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Window: 600x720 pixels (windowed mode)
+Background: Beige (#F5F5DC)
+
+╔═════════════════════════════════════════════════════════════════╗
+║                                                                 ║
+║                    Boomerang VS Spear                           ║  ← Title (centered, black text)
+║                                                                 ║
+║                                                                 ║
+║         ┌───────────────────────────────────────┐               ║
+║         │                                       │               ║
+║         │    ⟲                            ⟶    │               ║  ← Rotating weapons
+║         │   (yellow)                   (cyan)  │               ║     (boomerang left, spear right)
+║         │                                       │               ║
+║         │                                       │               ║
+║         │                                       │               ║
+║         │          ●                  ●         │               ║  ← Bouncing circles
+║         │         92                 91         │               ║     (yellow & cyan)
+║         │      (yellow)            (cyan)       │               ║     Moving with physics
+║         │                                       │               ║
+║         │                                       │               ║
+║         │                                       │               ║
+║         └───────────────────────────────────────┘               ║  ← 360x360 frame box
+║                                                                 ║     Black outline
+║         Throw Damage: 13          Damage/Length: 3.5            ║  ← Stats text
+║         (yellow)                           (cyan)               ║     (color-coded)
+║                                                                 ║
+╚═════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════
+                         ANIMATION DETAILS
+═══════════════════════════════════════════════════════════════════
+
+Circles (Radius: 28px each):
+• Yellow Circle (#92): Starts lower-left, velocity (2.5, -3.0)
+• Cyan Circle (#91): Starts lower-right, velocity (-2.0, -2.5)
+• Both bounce off frame walls with perfect reflection
+• Numbers displayed in black centered on circles
+
+Weapons (Rotating continuously):
+• Boomerang: V-shaped with curved arms, yellow, at (200, 180)
+• Spear: Shaft + triangular tip, cyan, at (400, 180)
+• Both rotate at 0.05 radians per frame (~3° per frame)
+
+Frame Box:
+• Position: (120, 140) to (480, 500)
+• Size: 360 × 360 pixels
+• Style: Black outline, 2px thick, no fill
+
+Text Elements:
+• Title: "Boomerang VS Spear" - centered at y=20, black
+• Left stat: "Throw Damage: 13" - at (120, 520), yellow
+• Right stat: "Damage/Length: 3.5" - right-aligned at (480, 520), cyan
+
+═══════════════════════════════════════════════════════════════════
+                         CONTROLS
+═══════════════════════════════════════════════════════════════════
+
+ESC - Exit application
+
+No other controls needed - everything is automatic!
+
+═══════════════════════════════════════════════════════════════════
+                    TECHNICAL IMPLEMENTATION
+═══════════════════════════════════════════════════════════════════
+
+Drawing APIs Used:
+• DrawBox() - background and frame
+• DrawCircleAA() - circles (filled + outline)
+• DrawLineAA() - weapon components
+• DrawTriangleAA() - spear tip
+• DrawString() - all text
+
+Physics:
+• Simple velocity-based movement
+• Axis-aligned bounding box collision with walls
+• Velocity reversal on collision
+
+Rendering:
+• Double-buffered (DX_SCREEN_BACK)
+• ClearDrawScreen() each frame
+• ScreenFlip() to present
+
+Performance:
+• Text width calculations done once at startup
+• Rotation uses sin/cos from standard math library
+• Runs smoothly at DxLib's default frame rate
+
+═══════════════════════════════════════════════════════════════════
