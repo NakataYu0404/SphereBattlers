@@ -39,6 +39,12 @@ const float WEAPON_BOUNCE_DAMPING = 0.8f;  // Damping factor for weapon bounce
 const float HIT_COOLDOWN_DURATION = 24.0f;  // ~0.4s at 60fps (frames) - cooldown between hits
 const float MAP_INPUT_COOLDOWN_DURATION = 10.0f;  // ~0.167s at 60fps (frames) - cooldown after battle return
 
+// Aim phase constants
+const float AIM_MIN_SPEED_SCALE = 0.3f;
+const float AIM_MAX_SPEED_SCALE = 1.0f;
+const float AIM_ARROW_LENGTH = 60.0f;
+const float AIM_DEFAULT_SPEED_MAG = 4.0f;  // Default speed magnitude for aiming
+
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
 const int TITLE_Y_POSITION = 30;
@@ -77,6 +83,12 @@ enum Scene {
     SCENE_MAP,
     SCENE_BATTLE,
     SCENE_REWARD
+};
+
+// Battle phase enum
+enum BattlePhase {
+    BATTLE_PHASE_AIM,      // Initial aiming phase
+    BATTLE_PHASE_FIGHTING  // Normal fighting phase
 };
 
 // Node type enum
@@ -746,6 +758,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     float hitStopTimer = 0.0f;
     bool battleEnded = false;
     bool playerWon = false;
+    BattlePhase battlePhase = BATTLE_PHASE_AIM;
+    
+    // Aim phase state
+    bool aimPhaseActive = false;
+    bool aimMouseDragging = false;
+    int aimMouseStartX = 0, aimMouseStartY = 0;
+    float aimKeyboardDirX = 0.0f, aimKeyboardDirY = 0.0f;
+    bool aimKeyboardActive = false;
     
     // Player character (persistent across battles)
     Circle playerChar;
@@ -888,6 +908,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             hitStopTimer = 0.0f;
                             battleEnded = false;
                             playerWon = false;
+                            battlePhase = BATTLE_PHASE_AIM;
+                            aimPhaseActive = true;
+                            aimMouseDragging = false;
+                            aimKeyboardDirX = 0.0f;
+                            aimKeyboardDirY = 0.0f;
+                            aimKeyboardActive = false;
                         } else {
                             // Other node types (event, shop, rest) - just return to map for now
                             // In a full implementation, these would have their own scenes
@@ -921,6 +947,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         hitStopTimer = 0.0f;
                         battleEnded = false;
                         playerWon = false;
+                        battlePhase = BATTLE_PHASE_AIM;
+                        aimPhaseActive = true;
+                        aimMouseDragging = false;
+                        aimKeyboardDirX = 0.0f;
+                        aimKeyboardDirY = 0.0f;
+                        aimKeyboardActive = false;
                     }
                 }
             }
@@ -935,7 +967,205 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             // Draw frame box
             DrawBox(FRAME_LEFT, FRAME_TOP, FRAME_RIGHT, FRAME_BOTTOM, COLOR_BLACK, FALSE);
             
-            if (!battleEnded) {
+            if (aimPhaseActive && battlePhase == BATTLE_PHASE_AIM) {
+                // ===== AIM PHASE =====
+                
+                // Get mouse position
+                int mouseX, mouseY;
+                GetMousePoint(&mouseX, &mouseY);
+                int mouseState = GetMouseInput();
+                
+                // Calculate player center for mouse drag detection
+                float playerCenterX = circles[0].x;
+                float playerCenterY = circles[0].y;
+                float distToPlayerSq = (mouseX - playerCenterX) * (mouseX - playerCenterX) + 
+                                       (mouseY - playerCenterY) * (mouseY - playerCenterY);
+                
+                // Mouse drag mechanics
+                if ((mouseState & MOUSE_INPUT_LEFT) && !aimMouseDragging) {
+                    // Check if mouse is near player (within circle radius * 2 for easier interaction)
+                    if (distToPlayerSq < (CIRCLE_RADIUS * 2.0f) * (CIRCLE_RADIUS * 2.0f)) {
+                        aimMouseDragging = true;
+                        aimMouseStartX = mouseX;
+                        aimMouseStartY = mouseY;
+                        aimKeyboardActive = false;  // Disable keyboard aiming when mouse dragging
+                    }
+                }
+                
+                if (aimMouseDragging) {
+                    if (!(mouseState & MOUSE_INPUT_LEFT)) {
+                        // Mouse released - confirm aim and set velocity
+                        float dx = mouseX - playerCenterX;
+                        float dy = mouseY - playerCenterY;
+                        float mag = sqrtf(dx * dx + dy * dy);
+                        
+                        if (mag > 1.0f) {
+                            // Calculate base speed magnitude from initial velocity
+                            float baseSpeedMag = sqrtf(circles[0].vx * circles[0].vx + circles[0].vy * circles[0].vy);
+                            if (baseSpeedMag < 0.1f) baseSpeedMag = AIM_DEFAULT_SPEED_MAG;
+                            
+                            // Scale based on drag distance (normalize and clamp)
+                            float scale = mag / AIM_ARROW_LENGTH;
+                            scale = (scale < AIM_MIN_SPEED_SCALE) ? AIM_MIN_SPEED_SCALE : 
+                                   ((scale > AIM_MAX_SPEED_SCALE) ? AIM_MAX_SPEED_SCALE : scale);
+                            
+                            // Set player velocity
+                            circles[0].vx = (dx / mag) * baseSpeedMag * scale;
+                            circles[0].vy = (dy / mag) * baseSpeedMag * scale;
+                        }
+                        
+                        // End aim phase
+                        aimPhaseActive = false;
+                        battlePhase = BATTLE_PHASE_FIGHTING;
+                        aimMouseDragging = false;
+                    }
+                }
+                
+                // Keyboard aiming mechanics (only if not mouse dragging)
+                if (!aimMouseDragging) {
+                    bool leftKey = CheckHitKey(KEY_INPUT_LEFT) || CheckHitKey(KEY_INPUT_A);
+                    bool rightKey = CheckHitKey(KEY_INPUT_RIGHT) || CheckHitKey(KEY_INPUT_D);
+                    bool upKey = CheckHitKey(KEY_INPUT_UP) || CheckHitKey(KEY_INPUT_W);
+                    bool downKey = CheckHitKey(KEY_INPUT_DOWN) || CheckHitKey(KEY_INPUT_S);
+                    
+                    if (leftKey || rightKey || upKey || downKey) {
+                        aimKeyboardActive = true;
+                        aimKeyboardDirX = 0.0f;
+                        aimKeyboardDirY = 0.0f;
+                        
+                        if (leftKey) aimKeyboardDirX -= 1.0f;
+                        if (rightKey) aimKeyboardDirX += 1.0f;
+                        if (upKey) aimKeyboardDirY -= 1.0f;
+                        if (downKey) aimKeyboardDirY += 1.0f;
+                        
+                        // Normalize direction
+                        float mag = sqrtf(aimKeyboardDirX * aimKeyboardDirX + aimKeyboardDirY * aimKeyboardDirY);
+                        if (mag > 0.1f) {
+                            aimKeyboardDirX /= mag;
+                            aimKeyboardDirY /= mag;
+                        }
+                    } else if (aimKeyboardActive) {
+                        // Keys released without confirmation - reset
+                        aimKeyboardActive = false;
+                    }
+                    
+                    // Confirm with Enter/Space
+                    bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
+                    bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
+                    
+                    if ((enterPressed || spacePressed) && aimKeyboardActive) {
+                        // Set velocity based on keyboard direction
+                        float baseSpeedMag = sqrtf(circles[0].vx * circles[0].vx + circles[0].vy * circles[0].vy);
+                        if (baseSpeedMag < 0.1f) baseSpeedMag = AIM_DEFAULT_SPEED_MAG;
+                        
+                        circles[0].vx = aimKeyboardDirX * baseSpeedMag;
+                        circles[0].vy = aimKeyboardDirY * baseSpeedMag;
+                        
+                        // End aim phase
+                        aimPhaseActive = false;
+                        battlePhase = BATTLE_PHASE_FIGHTING;
+                        aimKeyboardActive = false;
+                    } else if ((enterPressed || spacePressed) && !aimKeyboardActive) {
+                        // Enter/Space without keyboard input - use default velocity
+                        aimPhaseActive = false;
+                        battlePhase = BATTLE_PHASE_FIGHTING;
+                    }
+                }
+                
+                // Draw characters in aim phase (static, no movement)
+                for (int i = 0; i < 2; i++) {
+                    // Draw circle with outline
+                    DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, circles[i].color, TRUE);
+                    DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, COLOR_BLACK, FALSE);
+                    
+                    // Draw HP number inside circle
+                    DrawFormatString((int)(circles[i].x + CIRCLE_NUMBER_X_OFFSET), 
+                                   (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].hp);
+                }
+                
+                // Draw player aim arrow (yellow)
+                if (aimMouseDragging) {
+                    // Mouse drag arrow
+                    float dx = mouseX - playerCenterX;
+                    float dy = mouseY - playerCenterY;
+                    float mag = sqrtf(dx * dx + dy * dy);
+                    
+                    if (mag > 1.0f) {
+                        float arrowLen = (mag < AIM_ARROW_LENGTH) ? mag : AIM_ARROW_LENGTH;
+                        float dirX = dx / mag;
+                        float dirY = dy / mag;
+                        
+                        float endX = playerCenterX + dirX * arrowLen;
+                        float endY = playerCenterY + dirY * arrowLen;
+                        
+                        // Draw arrow line
+                        DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_YELLOW, 3.0f);
+                        
+                        // Draw arrowhead
+                        float arrowHeadLen = 10.0f;
+                        float arrowHeadAngle = 0.5f;  // radians
+                        float headX1 = endX - dirX * arrowHeadLen * cosf(arrowHeadAngle) + dirY * arrowHeadLen * sinf(arrowHeadAngle);
+                        float headY1 = endY - dirY * arrowHeadLen * cosf(arrowHeadAngle) - dirX * arrowHeadLen * sinf(arrowHeadAngle);
+                        float headX2 = endX - dirX * arrowHeadLen * cosf(arrowHeadAngle) - dirY * arrowHeadLen * sinf(arrowHeadAngle);
+                        float headY2 = endY - dirY * arrowHeadLen * cosf(arrowHeadAngle) + dirX * arrowHeadLen * sinf(arrowHeadAngle);
+                        
+                        DrawLineAA(endX, endY, headX1, headY1, COLOR_YELLOW, 3.0f);
+                        DrawLineAA(endX, endY, headX2, headY2, COLOR_YELLOW, 3.0f);
+                    }
+                } else if (aimKeyboardActive) {
+                    // Keyboard direction arrow
+                    float endX = playerCenterX + aimKeyboardDirX * AIM_ARROW_LENGTH;
+                    float endY = playerCenterY + aimKeyboardDirY * AIM_ARROW_LENGTH;
+                    
+                    // Draw arrow line
+                    DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_YELLOW, 3.0f);
+                    
+                    // Draw arrowhead
+                    float arrowHeadLen = 10.0f;
+                    float arrowHeadAngle = 0.5f;
+                    float headX1 = endX - aimKeyboardDirX * arrowHeadLen * cosf(arrowHeadAngle) + aimKeyboardDirY * arrowHeadLen * sinf(arrowHeadAngle);
+                    float headY1 = endY - aimKeyboardDirY * arrowHeadLen * cosf(arrowHeadAngle) - aimKeyboardDirX * arrowHeadLen * sinf(arrowHeadAngle);
+                    float headX2 = endX - aimKeyboardDirX * arrowHeadLen * cosf(arrowHeadAngle) - aimKeyboardDirY * arrowHeadLen * sinf(arrowHeadAngle);
+                    float headY2 = endY - aimKeyboardDirY * arrowHeadLen * cosf(arrowHeadAngle) + aimKeyboardDirX * arrowHeadLen * sinf(arrowHeadAngle);
+                    
+                    DrawLineAA(endX, endY, headX1, headY1, COLOR_YELLOW, 3.0f);
+                    DrawLineAA(endX, endY, headX2, headY2, COLOR_YELLOW, 3.0f);
+                }
+                
+                // Draw enemy aim arrow (cyan, fixed initial direction)
+                float enemyCenterX = circles[1].x;
+                float enemyCenterY = circles[1].y;
+                float enemyVx = circles[1].vx;
+                float enemyVy = circles[1].vy;
+                float enemySpeedMag = sqrtf(enemyVx * enemyVx + enemyVy * enemyVy);
+                
+                if (enemySpeedMag > 0.1f) {
+                    float enemyDirX = enemyVx / enemySpeedMag;
+                    float enemyDirY = enemyVy / enemySpeedMag;
+                    float enemyEndX = enemyCenterX + enemyDirX * AIM_ARROW_LENGTH;
+                    float enemyEndY = enemyCenterY + enemyDirY * AIM_ARROW_LENGTH;
+                    
+                    // Draw arrow line
+                    DrawLineAA(enemyCenterX, enemyCenterY, enemyEndX, enemyEndY, COLOR_CYAN, 3.0f);
+                    
+                    // Draw arrowhead
+                    float arrowHeadLen = 10.0f;
+                    float arrowHeadAngle = 0.5f;
+                    float headX1 = enemyEndX - enemyDirX * arrowHeadLen * cosf(arrowHeadAngle) + enemyDirY * arrowHeadLen * sinf(arrowHeadAngle);
+                    float headY1 = enemyEndY - enemyDirY * arrowHeadLen * cosf(arrowHeadAngle) - enemyDirX * arrowHeadLen * sinf(arrowHeadAngle);
+                    float headX2 = enemyEndX - enemyDirX * arrowHeadLen * cosf(arrowHeadAngle) - enemyDirY * arrowHeadLen * sinf(arrowHeadAngle);
+                    float headY2 = enemyEndY - enemyDirY * arrowHeadLen * cosf(arrowHeadAngle) + enemyDirX * arrowHeadLen * sinf(arrowHeadAngle);
+                    
+                    DrawLineAA(enemyEndX, enemyEndY, headX1, headY1, COLOR_CYAN, 3.0f);
+                    DrawLineAA(enemyEndX, enemyEndY, headX2, headY2, COLOR_CYAN, 3.0f);
+                }
+                
+                // Draw aim phase instructions
+                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION, COLOR_BLACK, "Aim Phase");
+                DrawFormatString(SCREEN_WIDTH / 2 - 150, TITLE_Y_POSITION + 20, COLOR_BLACK, "Drag from player or use Arrow/WASD + Enter");
+                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 40, COLOR_BLACK, "Enter/Space: Start with default");
+                
+            } else if (!battleEnded) {
                 // Update hit-stop timer
                 bool inHitStop = (hitStopTimer > 0.0f);
                 if (inHitStop) {
@@ -1043,7 +1273,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
                 bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
                 
-                if (enterPressed || spacePressed) {
+                // Check for mouse click (edge trigger)
+                int mouseState = GetMouseInput();
+                bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
+                prevMouseState = mouseState;
+                
+                if (enterPressed || spacePressed || (mouseClicked && playerWon)) {
                     if (playerWon) {
                         // Update player character state
                         playerChar.hp = circles[0].hp;
@@ -1151,7 +1386,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if (battleEnded) {
                 if (playerWon) {
                     DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Victory!");
-                    DrawFormatString(SCREEN_WIDTH / 2 - 80, TITLE_Y_POSITION + 20, COLOR_BLACK, "Press Enter/Space to continue");
+                    DrawFormatString(SCREEN_WIDTH / 2 - 120, TITLE_Y_POSITION + 20, COLOR_BLACK, "Click or press Enter/Space to continue");
                 } else {
                     DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Defeat!");
                     DrawFormatString(SCREEN_WIDTH / 2 - 80, TITLE_Y_POSITION + 20, COLOR_BLACK, "Press Enter/Space to retry");
