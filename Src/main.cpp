@@ -671,7 +671,7 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
         enemy.vy = -3.5f;
         enemy.angularVel = -0.025f;
         enemy.color = COLOR_CYAN;
-        enemy.hp = MAX_HP;
+        enemy.hp = 10;
         enemy.weapon.type = WEAPON_SPEAR;
         enemy.weapon.offsetX = 45.0f;
         enemy.weapon.offsetY = 0.0f;
