@@ -157,6 +157,11 @@ void ResetMapInputState(float& cooldown, bool& prevEnter, bool& prevSpace) {
     prevSpace = true;
 }
 
+// Helper function to calculate total weapon damage for a character
+int GetTotalWeaponDamage(const Circle& character) {
+    return WEAPON_DAMAGE + character.weaponDamage;
+}
+
 // Boss save/load functions
 void SaveBossToJSON(const Circle& player) {
     try {
@@ -980,8 +985,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             // Apply damage only if cooldown expired and we had separation
                             if (circles[1].hitCooldown <= 0.0f && !circles[1].wasHitLastFrame) {
                                 circles[1].hitTimer = HIT_FEEDBACK_DURATION;
-                                int damage = WEAPON_DAMAGE + circles[0].weaponDamage;
-                                circles[1].hp -= damage;
+                                circles[1].hp -= GetTotalWeaponDamage(circles[0]);
                                 if (circles[1].hp <= 0) {
                                     circles[1].isAlive = false;
                                     battleEnded = true;
@@ -1001,8 +1005,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             // Apply damage only if cooldown expired and we had separation
                             if (circles[0].hitCooldown <= 0.0f && !circles[0].wasHitLastFrame) {
                                 circles[0].hitTimer = HIT_FEEDBACK_DURATION;
-                                int damage = WEAPON_DAMAGE + circles[1].weaponDamage;
-                                circles[0].hp -= damage;
+                                circles[0].hp -= GetTotalWeaponDamage(circles[1]);
                                 if (circles[0].hp <= 0) {
                                     circles[0].isAlive = false;
                                     battleEnded = true;
@@ -1232,10 +1235,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     // Speed +0.1
                     float oldSpeed = playerChar.baseSpeed;
                     playerChar.baseSpeed += 0.1f;
-                    // Apply proportionally to current velocity
-                    float speedMult = playerChar.baseSpeed / oldSpeed;
-                    playerChar.vx *= speedMult;
-                    playerChar.vy *= speedMult;
+                    // Apply proportionally to current velocity (avoid division by zero)
+                    if (oldSpeed > 0.0f) {
+                        float speedMult = playerChar.baseSpeed / oldSpeed;
+                        playerChar.vx *= speedMult;
+                        playerChar.vy *= speedMult;
+                    }
                 }
                 
                 // Reset reward scene for next time
@@ -1264,15 +1269,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 if (i == 0) {
                     DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +10");
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(No healing)");
-                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Current: %d", playerChar.maxHP);
+                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", playerChar.maxHP);
                 } else if (i == 1) {
                     DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +1");
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Weapon dmg)");
-                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Current: %d", WEAPON_DAMAGE + playerChar.weaponDamage);
+                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", GetTotalWeaponDamage(playerChar));
                 } else if (i == 2) {
                     DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Speed +0.1");
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Movement)");
-                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Current: %.1f", playerChar.baseSpeed);
+                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %.1f", playerChar.baseSpeed);
                 }
             }
             
