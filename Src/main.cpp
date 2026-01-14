@@ -39,6 +39,12 @@ const float WEAPON_BOUNCE_DAMPING = 0.8f;  // Damping factor for weapon bounce
 const float HIT_COOLDOWN_DURATION = 24.0f;  // ~0.4s at 60fps (frames) - cooldown between hits
 const float MAP_INPUT_COOLDOWN_DURATION = 10.0f;  // ~0.167s at 60fps (frames) - cooldown after battle return
 
+// Math constants
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+const float INITIAL_WEAPON_ANGLE = -M_PI / 2.0f;  // Initial angle facing upward
+
 // Aim phase constants
 const float AIM_MIN_SPEED_SCALE = 0.3f;
 const float AIM_MAX_SPEED_SCALE = 1.0f;
@@ -684,7 +690,7 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
     // Initialize enemy
     enemy.x = FRAME_LEFT + FRAME_WIDTH * 0.7f;
     enemy.y = FRAME_BOTTOM - 80.0f;
-    enemy.angle = 0.0f;
+    enemy.angle = INITIAL_WEAPON_ANGLE;
     enemy.number = 91;
     enemy.hitTimer = 0.0f;
     enemy.isAlive = true;
@@ -774,7 +780,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     playerChar.y = FRAME_BOTTOM - 80.0f;
     playerChar.vx = 2.5f;
     playerChar.vy = -3.0f;
-    playerChar.angle = 0.0f;
+    playerChar.angle = INITIAL_WEAPON_ANGLE;
     playerChar.angularVel = 0.03f;
     playerChar.number = 92;
     playerChar.color = COLOR_YELLOW;
