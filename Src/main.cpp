@@ -1,4 +1,5 @@
 #include <DxLib.h>
+#include <windows.h>
 #include <cmath>
 
 // Constants
@@ -15,6 +16,10 @@ const unsigned int COLOR_BEIGE = 0xF5F5DC;
 const unsigned int COLOR_YELLOW = 0xFFFF00;
 const unsigned int COLOR_CYAN = 0x00FFFF;
 const unsigned int COLOR_BLACK = 0x000000;
+
+// Text positioning constants
+const int TITLE_X_OFFSET = -100;
+const int STATS_RIGHT_X_OFFSET = -150;
 
 // Circle struct
 struct Circle {
@@ -180,11 +185,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DrawSpear(spear.x, spear.y, spear.angle, COLOR_CYAN);
         
         // Draw title text at top
-        DrawFormatString(SCREEN_WIDTH / 2 - 100, 30, COLOR_BLACK, "Boomerang VS Spear");
+        DrawFormatString(SCREEN_WIDTH / 2 + TITLE_X_OFFSET, 30, COLOR_BLACK, "Boomerang VS Spear");
         
         // Draw stats at bottom
         DrawFormatString(FRAME_LEFT, FRAME_BOTTOM + 30, COLOR_YELLOW, "Throw Damage: 13");
-        DrawFormatString(FRAME_RIGHT - 150, FRAME_BOTTOM + 30, COLOR_CYAN, "Damage/Length: 3.5");
+        DrawFormatString(FRAME_RIGHT + STATS_RIGHT_X_OFFSET, FRAME_BOTTOM + 30, COLOR_CYAN, "Damage/Length: 3.5");
         
         ScreenFlip();
     }
