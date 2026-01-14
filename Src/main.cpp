@@ -16,6 +16,8 @@ const unsigned int COLOR_BEIGE = 0xF5F5DC;
 const unsigned int COLOR_YELLOW = 0xFFFF00;
 const unsigned int COLOR_CYAN = 0x00FFFF;
 const unsigned int COLOR_BLACK = 0x000000;
+const unsigned int COLOR_HIT_FEEDBACK = 0xFF6666;
+const float HIT_FEEDBACK_DURATION = 10.0f;
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
@@ -103,6 +105,15 @@ void DrawSpear(float x, float y, float angle, unsigned int color) {
     DrawTriangleAA(tipX, tipY, baseX1, baseY1, baseX2, baseY2, color, TRUE);
 }
 
+// Helper function: Calculate weapon world position from player position and rotation
+void GetWeaponWorldPosition(const Circle& player, float& outX, float& outY) {
+    float cos_player = cosf(player.angle);
+    float sin_player = sinf(player.angle);
+    
+    outX = player.x + (cos_player * player.weapon.offsetX - sin_player * player.weapon.offsetY);
+    outY = player.y + (sin_player * player.weapon.offsetX + cos_player * player.weapon.offsetY);
+}
+
 // Helper function: Calculate distance from point to line segment
 float DistancePointToSegment(float px, float py, float x1, float y1, float x2, float y2) {
     float dx = x2 - x1;
@@ -131,12 +142,8 @@ float DistancePointToSegment(float px, float py, float x1, float y1, float x2, f
 // Check if weapon hits a player (line segment vs circle)
 bool CheckWeaponHit(const Circle& attacker, const Circle& target) {
     // Get weapon world position
-    float cos_player = cosf(attacker.angle);
-    float sin_player = sinf(attacker.angle);
-    
-    // Rotate offset to world space
-    float weaponWorldX = attacker.x + (cos_player * attacker.weapon.offsetX - sin_player * attacker.weapon.offsetY);
-    float weaponWorldY = attacker.y + (sin_player * attacker.weapon.offsetX + cos_player * attacker.weapon.offsetY);
+    float weaponWorldX, weaponWorldY;
+    GetWeaponWorldPosition(attacker, weaponWorldX, weaponWorldY);
     
     // Weapon line segment endpoints
     float weaponAngle = attacker.weapon.weaponAngle;
@@ -295,10 +302,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         
         // Check weapon hits
         if (CheckWeaponHit(circles[0], circles[1])) {
-            circles[1].hitTimer = 10.0f;  // Hit feedback duration
+            circles[1].hitTimer = HIT_FEEDBACK_DURATION;
         }
         if (CheckWeaponHit(circles[1], circles[0])) {
-            circles[0].hitTimer = 10.0f;
+            circles[0].hitTimer = HIT_FEEDBACK_DURATION;
         }
         
         // Draw circles with hit feedback
@@ -307,8 +314,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             // Apply red flash if hit
             if (circles[i].hitTimer > 0.0f) {
-                // Mix with red for hit feedback
-                drawColor = 0xFF6666;  // Reddish tint
+                drawColor = COLOR_HIT_FEEDBACK;
             }
             
             // Draw circle with outline
@@ -322,11 +328,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // Draw weapons at player positions with rotated offsets
         for (int i = 0; i < 2; i++) {
             // Calculate weapon world position
-            float cos_player = cosf(circles[i].angle);
-            float sin_player = sinf(circles[i].angle);
-            
-            float weaponWorldX = circles[i].x + (cos_player * circles[i].weapon.offsetX - sin_player * circles[i].weapon.offsetY);
-            float weaponWorldY = circles[i].y + (sin_player * circles[i].weapon.offsetX + cos_player * circles[i].weapon.offsetY);
+            float weaponWorldX, weaponWorldY;
+            GetWeaponWorldPosition(circles[i], weaponWorldX, weaponWorldY);
             
             // Draw weapon
             if (circles[i].weapon.type == WEAPON_BOOMERANG) {
