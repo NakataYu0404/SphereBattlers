@@ -21,6 +21,7 @@ const float HIT_FEEDBACK_DURATION = 10.0f;
 const int MAX_HP = 100;
 const int WEAPON_DAMAGE = 10;
 const float HIT_STOP_DURATION = 10.0f;  // ~100ms at 60fps (frames)
+const float WEAPON_COLLISION_THRESHOLD = 5.0f;  // Distance threshold for weapon-weapon collision
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
@@ -243,9 +244,8 @@ bool HandleWeaponCollision(Circle& c1, Circle& c2) {
     // Check if weapons are close enough to collide
     float dist = SegmentDistance(w1x1, w1y1, w1x2, w1y2, w2x1, w2y1, w2x2, w2y2);
     
-    if (dist < 5.0f) {  // Collision threshold
+    if (dist < WEAPON_COLLISION_THRESHOLD) {
         // Simple bounce: reverse angular velocities to make weapons separate
-        float tempAngVel = c1.angularVel;
         c1.angularVel = -c1.angularVel * 0.8f;
         c2.angularVel = -c2.angularVel * 0.8f;
         
