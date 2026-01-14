@@ -146,6 +146,7 @@ bool DetectKeyPressEdge(int keyCode, bool& prevState) {
 }
 
 // Helper function to reset map input state after battle
+// Marks keys as "pressed" so DetectKeyPressEdge will require a key release before detecting next press
 void ResetMapInputState(float& cooldown, bool& prevEnter, bool& prevSpace) {
     cooldown = MAP_INPUT_COOLDOWN_DURATION;
     prevEnter = true;   // Mark as pressed to prevent immediate re-trigger
