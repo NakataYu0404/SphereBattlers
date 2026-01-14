@@ -217,6 +217,13 @@ bool CheckWeaponWeaponCollision(const Circle& player1, const Circle& player2) {
     return minDist < WEAPON_COLLISION_THRESHOLD;
 }
 
+// Helper function to update cooldown timer
+void UpdateCooldownTimer(float& timer) {
+    if (timer > 0.0f) {
+        timer -= MS_PER_FRAME;
+    }
+}
+
 // Check and handle circle-circle collision
 void HandlePlayerCollision(Circle& c1, Circle& c2, CollisionCooldown& cooldown) {
     float dx = c2.x - c1.x;
@@ -389,18 +396,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         
         // Update cooldown timers
-        if (cooldown.playerPlayerCooldown > 0.0f) {
-            cooldown.playerPlayerCooldown -= MS_PER_FRAME;
-        }
-        if (cooldown.weapon0ToPlayer1Cooldown > 0.0f) {
-            cooldown.weapon0ToPlayer1Cooldown -= MS_PER_FRAME;
-        }
-        if (cooldown.weapon1ToPlayer0Cooldown > 0.0f) {
-            cooldown.weapon1ToPlayer0Cooldown -= MS_PER_FRAME;
-        }
-        if (cooldown.weaponWeaponCooldown > 0.0f) {
-            cooldown.weaponWeaponCooldown -= MS_PER_FRAME;
-        }
+        UpdateCooldownTimer(cooldown.playerPlayerCooldown);
+        UpdateCooldownTimer(cooldown.weapon0ToPlayer1Cooldown);
+        UpdateCooldownTimer(cooldown.weapon1ToPlayer0Cooldown);
+        UpdateCooldownTimer(cooldown.weaponWeaponCooldown);
         
         // Handle player-player collision (only if both alive)
         if (circles[0].hp > 0 && circles[1].hp > 0) {
