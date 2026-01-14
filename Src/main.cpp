@@ -37,6 +37,7 @@ const float HIT_STOP_DURATION = 20.0f;  // ~100ms at 60fps (frames)
 const float WEAPON_COLLISION_THRESHOLD = 5.0f;  // Distance threshold for weapon-weapon collision
 const float WEAPON_BOUNCE_DAMPING = 0.8f;  // Damping factor for weapon bounce
 const float HIT_COOLDOWN_DURATION = 24.0f;  // ~0.4s at 60fps (frames) - cooldown between hits
+const float MAP_INPUT_COOLDOWN_DURATION = 10.0f;  // ~0.167s at 60fps (frames) - cooldown after battle return
 
 // Text positioning constants
 const int TITLE_X_OFFSET = -100;
@@ -133,6 +134,14 @@ struct Circle {
 // Helper function to clamp HP to valid range
 int ClampHP(int hp) {
     return (hp > MAX_HP) ? MAX_HP : ((hp < 0) ? 0 : hp);
+}
+
+// Helper function to detect key press edge (new press only, not held)
+bool DetectKeyPressEdge(int keyCode, bool& prevState) {
+    bool currentState = CheckHitKey(keyCode) != 0;
+    bool pressed = currentState && !prevState;
+    prevState = currentState;
+    return pressed;
 }
 
 // Boss save/load functions
@@ -740,7 +749,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     // Input cooldown for map scene after battle return
     float mapInputCooldown = 0.0f;
-    const float MAP_INPUT_COOLDOWN_DURATION = 10.0f;  // ~0.167s at 60fps
     
     // Keyboard state tracking for edge detection
     bool prevEnterKeyState = false;
@@ -829,12 +837,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     }
                     
                     // Enter or Space to select (with edge detection and cooldown)
-                    bool currentEnterKeyState = CheckHitKey(KEY_INPUT_RETURN) != 0;
-                    bool currentSpaceKeyState = CheckHitKey(KEY_INPUT_SPACE) != 0;
-                    bool enterPressed = currentEnterKeyState && !prevEnterKeyState;
-                    bool spacePressed = currentSpaceKeyState && !prevSpaceKeyState;
-                    prevEnterKeyState = currentEnterKeyState;
-                    prevSpaceKeyState = currentSpaceKeyState;
+                    bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
+                    bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
                     
                     if ((enterPressed || spacePressed) && highlightedNodeIndex >= 0 && mapInputCooldown <= 0.0f) {
                         // Select this node
@@ -1009,12 +1013,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
             } else {
                 // Battle ended - wait for input to return to map
-                bool currentEnterKeyState = CheckHitKey(KEY_INPUT_RETURN) != 0;
-                bool currentSpaceKeyState = CheckHitKey(KEY_INPUT_SPACE) != 0;
-                bool enterPressed = currentEnterKeyState && !prevEnterKeyState;
-                bool spacePressed = currentSpaceKeyState && !prevSpaceKeyState;
-                prevEnterKeyState = currentEnterKeyState;
-                prevSpaceKeyState = currentSpaceKeyState;
+                bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
+                bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
                 
                 if (enterPressed || spacePressed) {
                     if (playerWon) {
