@@ -117,6 +117,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     float boomerangAngle = 0.0f;
     float spearAngle = 0.0f;
     
+    // Pre-calculate text widths (done once, not every frame)
+    const char* titleText = "Boomerang VS Spear";
+    int titleWidth = GetDrawStringWidth(titleText, strlen(titleText));
+    const char* damageText = "Throw Damage: 13";
+    const char* damagePerLengthText = "Damage/Length: 3.5";
+    int damagePerLengthWidth = GetDrawStringWidth(damagePerLengthText, strlen(damagePerLengthText));
+    
     // Main loop
     while (ProcessMessage() == 0) {
         // Check ESC key to quit
@@ -161,9 +168,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, BLACK_COLOR, FALSE);
             
             // Draw number on circle
-            char numStr[8];
-            sprintf_s(numStr, "%d", circles[i].number);
-            int textWidth = GetDrawStringWidth(numStr, strlen(numStr));
+            char numStr[16];  // Increased buffer size for safety
+            int numLen = sprintf_s(numStr, "%d", circles[i].number);
+            int textWidth = GetDrawStringWidth(numStr, numLen);
             DrawString((int)circles[i].x - textWidth / 2, (int)circles[i].y - 8, numStr, BLACK_COLOR);
         }
         
@@ -176,14 +183,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DrawSpear(FRAME_RIGHT - 80, FRAME_TOP + 40, spearAngle, CYAN_COLOR);
         
         // Draw title text at top
-        const char* titleText = "Boomerang VS Spear";
-        int titleWidth = GetDrawStringWidth(titleText, strlen(titleText));
         DrawString((SCREEN_WIDTH - titleWidth) / 2, 20, titleText, BLACK_COLOR);
         
         // Draw stats text at bottom
-        DrawString(FRAME_LEFT, FRAME_BOTTOM + 20, "Throw Damage: 13", YELLOW_COLOR);
-        DrawString(FRAME_RIGHT - GetDrawStringWidth("Damage/Length: 3.5", strlen("Damage/Length: 3.5")), 
-                   FRAME_BOTTOM + 20, "Damage/Length: 3.5", CYAN_COLOR);
+        DrawString(FRAME_LEFT, FRAME_BOTTOM + 20, damageText, YELLOW_COLOR);
+        DrawString(FRAME_RIGHT - damagePerLengthWidth, FRAME_BOTTOM + 20, damagePerLengthText, CYAN_COLOR);
         
         // Flip screen
         ScreenFlip();
