@@ -45,6 +45,9 @@ const float MAP_INPUT_COOLDOWN_DURATION = 10.0f;  // ~0.167s at 60fps (frames) -
 #endif
 const float INITIAL_WEAPON_ANGLE = -M_PI / 2.0f;  // Initial angle facing upward
 
+// Weapon rendering constants
+const float WEAPON_REFERENCE_LENGTH = 30.0f;  // Base reference length for weapon scaling
+
 // Aim phase constants
 const float AIM_MIN_SPEED_SCALE = 0.3f;
 const float AIM_MAX_SPEED_SCALE = 1.0f;
@@ -302,10 +305,10 @@ const char* GetNodeTypeName(NodeType type) {
 // Function to draw a boomerang
 void DrawBoomerang(float x, float y, float angle, float length, unsigned int color) {
     // Boomerang as two connected arcs forming a V shape
-    // Scale arm length based on length parameter (base reference: 20.0f for length=30.0f)
+    // Scale proportionally: arm extends 20.0f at reference length, scale maintains this ratio
     float cos_a = cosf(angle);
     float sin_a = sinf(angle);
-    float scale = length / 30.0f;  // Scale based on reference length
+    float scale = length / WEAPON_REFERENCE_LENGTH;  // Scale based on reference length
     
     // First arm (scaled)
     float x1 = x + cos_a * 20.0f * scale - sin_a * 5.0f * scale;
