@@ -327,22 +327,25 @@ const char* GetNodeTypeName(NodeType type) {
 // Function to draw a boomerang
 void DrawBoomerang(float x, float y, float angle, float length, unsigned int color) {
     // Boomerang as two connected arcs forming a V shape
-    // Scale proportionally: arm extends 20.0f at reference length, scale maintains this ratio
+    // Arms extend forward by 'length' parameter with V-shape spread
     float cos_a = cosf(angle);
     float sin_a = sinf(angle);
-    float scale = length / WEAPON_REFERENCE_LENGTH;  // Scale based on reference length
     
-    // First arm (scaled)
-    float x1 = x + cos_a * 20.0f * scale - sin_a * 5.0f * scale;
-    float y1 = y + sin_a * 20.0f * scale + cos_a * 5.0f * scale;
-    float x2 = x + cos_a * 5.0f * scale - sin_a * 2.0f * scale;
-    float y2 = y + sin_a * 5.0f * scale + cos_a * 2.0f * scale;
+    // Calculate spread proportional to length
+    float forwardDist = length;  // Main forward extension
+    float spreadWidth = length * 0.25f;  // Perpendicular spread (25% of length)
     
-    // Second arm (scaled)
-    float x3 = x + cos_a * 5.0f * scale + sin_a * 2.0f * scale;
-    float y3 = y + sin_a * 5.0f * scale - cos_a * 2.0f * scale;
-    float x4 = x + cos_a * 20.0f * scale + sin_a * 5.0f * scale;
-    float y4 = y + sin_a * 20.0f * scale - cos_a * 5.0f * scale;
+    // First arm (extends forward-left in V shape)
+    float x1 = x + cos_a * forwardDist - sin_a * spreadWidth;
+    float y1 = y + sin_a * forwardDist + cos_a * spreadWidth;
+    float x2 = x + cos_a * forwardDist * 0.25f - sin_a * spreadWidth * 0.4f;
+    float y2 = y + sin_a * forwardDist * 0.25f + cos_a * spreadWidth * 0.4f;
+    
+    // Second arm (extends forward-right in V shape)
+    float x3 = x + cos_a * forwardDist * 0.25f + sin_a * spreadWidth * 0.4f;
+    float y3 = y + sin_a * forwardDist * 0.25f - cos_a * spreadWidth * 0.4f;
+    float x4 = x + cos_a * forwardDist + sin_a * spreadWidth;
+    float y4 = y + sin_a * forwardDist - cos_a * spreadWidth;
     
     // Draw lines for boomerang arms
     DrawLineAA(x, y, x1, y1, color, 3.0f);
@@ -356,12 +359,12 @@ void DrawSpear(float x, float y, float angle, float length, unsigned int color) 
     float cos_a = cosf(angle);
     float sin_a = sinf(angle);
     
-    // Spear shaft (scaled by length parameter)
+    // Spear shaft extends only forward (in the direction of angle)
     float shaftLen = length;
-    float sx = x - cos_a * shaftLen * 0.5f;
-    float sy = y - sin_a * shaftLen * 0.5f;
-    float ex = x + cos_a * shaftLen * 0.5f;
-    float ey = y + sin_a * shaftLen * 0.5f;
+    float sx = x;  // Start at weapon base
+    float sy = y;
+    float ex = x + cos_a * shaftLen;  // Extend forward by full length
+    float ey = y + sin_a * shaftLen;
     DrawLineAA(sx, sy, ex, ey, color, 3.0f);
     
     // Spear head (triangle) - extends from shaft end
@@ -411,20 +414,20 @@ float DistancePointToSegment(float px, float py, float x1, float y1, float x2, f
 
 // Check if weapon hits a player (line segment vs circle)
 bool CheckWeaponHit(const Circle& attacker, const Circle& target) {
-    // Get weapon world position
+    // Get weapon world position (base of weapon)
     float weaponWorldX, weaponWorldY;
     GetWeaponWorldPosition(attacker, weaponWorldX, weaponWorldY);
     
-    // Weapon line segment endpoints (using player's angle)
+    // Weapon line segment extends only forward from base
     float weaponAngle = attacker.angle;
     float cos_w = cosf(weaponAngle);
     float sin_w = sinf(weaponAngle);
-    float halfLen = attacker.weapon.length * 0.5f;
+    float weaponLen = attacker.weapon.length;
     
-    float x1 = weaponWorldX - cos_w * halfLen;
-    float y1 = weaponWorldY - sin_w * halfLen;
-    float x2 = weaponWorldX + cos_w * halfLen;
-    float y2 = weaponWorldY + sin_w * halfLen;
+    float x1 = weaponWorldX;  // Start at weapon base
+    float y1 = weaponWorldY;
+    float x2 = weaponWorldX + cos_w * weaponLen;  // Extend forward by full length
+    float y2 = weaponWorldY + sin_w * weaponLen;
     
     // Check distance from target center to weapon segment
     float dist = DistancePointToSegment(target.x, target.y, x1, y1, x2, y2);
@@ -485,27 +488,27 @@ float SegmentDistance(float x1, float y1, float x2, float y2, float x3, float y3
 
 // Check and handle weapon-weapon collision
 bool HandleWeaponCollision(Circle& c1, Circle& c2) {
-    // Get weapon world positions
+    // Get weapon world positions (bases)
     float w1x, w1y, w2x, w2y;
     GetWeaponWorldPosition(c1, w1x, w1y);
     GetWeaponWorldPosition(c2, w2x, w2y);
     
-    // Calculate weapon segment endpoints
+    // Calculate weapon segment endpoints (forward only)
     float cos1 = cosf(c1.angle);
     float sin1 = sinf(c1.angle);
-    float halfLen1 = c1.weapon.length * 0.5f;
-    float w1x1 = w1x - cos1 * halfLen1;
-    float w1y1 = w1y - sin1 * halfLen1;
-    float w1x2 = w1x + cos1 * halfLen1;
-    float w1y2 = w1y + sin1 * halfLen1;
+    float len1 = c1.weapon.length;
+    float w1x1 = w1x;  // Start at base
+    float w1y1 = w1y;
+    float w1x2 = w1x + cos1 * len1;  // Extend forward
+    float w1y2 = w1y + sin1 * len1;
     
     float cos2 = cosf(c2.angle);
     float sin2 = sinf(c2.angle);
-    float halfLen2 = c2.weapon.length * 0.5f;
-    float w2x1 = w2x - cos2 * halfLen2;
-    float w2y1 = w2y - sin2 * halfLen2;
-    float w2x2 = w2x + cos2 * halfLen2;
-    float w2y2 = w2y + sin2 * halfLen2;
+    float len2 = c2.weapon.length;
+    float w2x1 = w2x;  // Start at base
+    float w2y1 = w2y;
+    float w2x2 = w2x + cos2 * len2;  // Extend forward
+    float w2y2 = w2y + sin2 * len2;
     
     // Check if weapons are close enough to collide
     float dist = SegmentDistance(w1x1, w1y1, w1x2, w1y2, w2x1, w2y1, w2x2, w2y2);
