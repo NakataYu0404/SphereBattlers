@@ -187,7 +187,6 @@ int GetTotalWeaponDamage(const Circle& character) {
 void SaveBossToJSON(const Circle& player) {
     try {
         json j;
-        j["hp"] = ClampHP(player.hp, player.maxHP);
         j["maxHP"] = player.maxHP;
         j["weaponDamage"] = player.weaponDamage;
         j["baseSpeed"] = player.baseSpeed;
@@ -215,11 +214,9 @@ bool LoadBossFromJSON(Circle& boss) {
         file >> j;
         file.close();
         
-        // Load boss parameters with clamping and validation
-        int loadedMaxHP = j.value("maxHP", MAX_HP);
-        int loadedHP = j.value("hp", loadedMaxHP);
-        boss.maxHP = loadedMaxHP;
-        boss.hp = ClampHP(loadedHP, loadedMaxHP);
+        // Load boss parameters with validation and defaults
+        boss.maxHP = j.value("maxHP", MAX_HP);
+        boss.hp = boss.maxHP;  // Set current HP to maxHP on load
         boss.weaponDamage = j.value("weaponDamage", 0);
         boss.baseSpeed = j.value("baseSpeed", 1.0f);
         
