@@ -665,22 +665,39 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
         pathNodeIdx = nodes[pathNodeIdx].parentNodeIndex;
     }
     
-    // Get current node's row to determine what's "ahead"
+    // Get current node's row
     int currentRow = nodes[currentNodeIndex].row;
     
-    // Draw gray edges for nodes that should show their connections:
-    // Show edges from nodes that are:
-    // 1. At current row or ahead (row >= currentRow), AND
-    // 2. Either not visited, OR on the taken path (current node)
+    // Build set of forward-reachable nodes from current position
+    std::vector<bool> forwardReachable(nodes.size(), false);
+    forwardReachable[currentNodeIndex] = true;
+    
+    // BFS to mark all forward-reachable nodes
+    std::vector<int> queue;
+    queue.push_back(currentNodeIndex);
+    size_t queuePos = 0;
+    
+    while (queuePos < queue.size()) {
+        int nodeIdx = queue[queuePos++];
+        for (int connectedIdx : nodes[nodeIdx].connectedNodes) {
+            if (!forwardReachable[connectedIdx]) {
+                forwardReachable[connectedIdx] = true;
+                queue.push_back(connectedIdx);
+            }
+        }
+    }
+    
+    // Draw gray edges for forward-reachable nodes
+    // (but not from past rows, those will be blue arrows or hidden)
     for (size_t i = 0; i < nodes.size(); i++) {
-        // Only show nodes at current row or ahead
+        // Skip nodes in past rows
         if (nodes[i].row < currentRow) {
-            continue;  // Skip nodes in past rows
+            continue;
         }
         
-        // For nodes at current row: only show if on taken path (i.e., the current node)
-        if (nodes[i].row == currentRow && !onTakenPath[i]) {
-            continue;  // Skip sibling nodes at current row that we didn't choose
+        // Only show nodes that are forward-reachable from current position
+        if (!forwardReachable[i]) {
+            continue;
         }
         
         // Draw edges from this node
