@@ -62,7 +62,7 @@ const int KO_TEXT_X_OFFSET = -20;
 const int KO_TEXT_Y_OFFSET = -10;
 
 // Map constants
-const int MAP_ROWS = 7;
+const int MAP_ROWS = 8;
 const int MAP_MIN_NODES_PER_ROW = 2;
 const int MAP_MAX_NODES_PER_ROW = 4;
 const float MAP_NODE_RADIUS = 20.0f;
@@ -451,8 +451,9 @@ bool HandleWeaponCollision(Circle& c1, Circle& c2) {
     
     if (dist < WEAPON_COLLISION_THRESHOLD) {
         // Simple bounce: reverse angular velocities to make weapons separate
-        c1.angularVel = -c1.angularVel * WEAPON_BOUNCE_DAMPING;
-        c2.angularVel = -c2.angularVel * WEAPON_BOUNCE_DAMPING;
+        // No damping to prevent rotation slowdown over time
+        c1.angularVel = -c1.angularVel;
+        c2.angularVel = -c2.angularVel;
         
         return true;  // Collision occurred
     }
@@ -481,7 +482,7 @@ std::vector<MapNode> GenerateMap() {
     nodes.push_back(startNode);
     
     // Rows 1-5: Mixed nodes (normal 70%, elite 10%, event 10%, rest 10%)
-    for (int row = 1; row < MAP_ROWS - 1; row++) {
+    for (int row = 1; row < MAP_ROWS - 2; row++) {
         // Random nodes per row based on constants
         std::uniform_int_distribution<> nodeDist(MAP_MIN_NODES_PER_ROW, MAP_MAX_NODES_PER_ROW);
         int numNodes = nodeDist(gen);
@@ -511,7 +512,17 @@ std::vector<MapNode> GenerateMap() {
         }
     }
     
-    // Row 6 (top): Boss node (single)
+    // Row 6 (MAP_ROWS - 2): Mandatory boss-ante rest node (single, must pass through)
+    MapNode bossAnteRestNode;
+    bossAnteRestNode.row = MAP_ROWS - 2;
+    bossAnteRestNode.col = 0;
+    bossAnteRestNode.type = NODE_REST;
+    bossAnteRestNode.visited = false;
+    bossAnteRestNode.reachable = false;
+    rowNodes[MAP_ROWS - 2].push_back(nodeIndex++);
+    nodes.push_back(bossAnteRestNode);
+    
+    // Row 7 (top): Boss node (single)
     MapNode bossNode;
     bossNode.row = MAP_ROWS - 1;
     bossNode.col = 0;
@@ -924,8 +935,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             aimKeyboardDirY = 0.0f;
                             aimKeyboardActive = false;
                         } else if (mapNodes[currentNodeIndex].type == NODE_REST) {
-                            // Rest node: heal 50% of maxHP (clamped to maxHP)
-                            int healAmount = playerChar.maxHP / 2;
+                            // Rest node healing
+                            // Boss-ante rest (row before boss) heals fully, general rest heals 50%
+                            int healAmount;
+                            if (mapNodes[currentNodeIndex].row == MAP_ROWS - 2) {
+                                // Boss-ante rest: heal to full maxHP
+                                healAmount = playerChar.maxHP - playerChar.hp;
+                            } else {
+                                // General rest: heal 50% of maxHP
+                                healAmount = playerChar.maxHP / 2;
+                            }
                             playerChar.hp = ClampHP(playerChar.hp + healAmount, playerChar.maxHP);
                             keyPressDelay = KEY_PRESS_COOLDOWN * 2;
                         } else {
@@ -968,8 +987,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         aimKeyboardDirY = 0.0f;
                         aimKeyboardActive = false;
                     } else if (mapNodes[currentNodeIndex].type == NODE_REST) {
-                        // Rest node: heal 50% of maxHP (clamped to maxHP)
-                        int healAmount = playerChar.maxHP / 2;
+                        // Rest node healing
+                        // Boss-ante rest (row before boss) heals fully, general rest heals 50%
+                        int healAmount;
+                        if (mapNodes[currentNodeIndex].row == MAP_ROWS - 2) {
+                            // Boss-ante rest: heal to full maxHP
+                            healAmount = playerChar.maxHP - playerChar.hp;
+                        } else {
+                            // General rest: heal 50% of maxHP
+                            healAmount = playerChar.maxHP / 2;
+                        }
                         playerChar.hp = ClampHP(playerChar.hp + healAmount, playerChar.maxHP);
                     }
                 }
@@ -1485,8 +1512,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if ((enterPressed || spacePressed || mouseClicked) && mapInputCooldown <= 0.0f) {
                 // Apply selected reward with multiplier
                 if (selectedReward == 0) {
-                    // Max HP +10 (no healing) * multiplier
-                    playerChar.maxHP += 10 * rewardMultiplier;
+                    // Max HP +10 * multiplier, also heal by the same amount (clamped to new maxHP)
+                    int hpIncrease = 10 * rewardMultiplier;
+                    playerChar.maxHP += hpIncrease;
+                    playerChar.hp = ClampHP(playerChar.hp + hpIncrease, playerChar.maxHP);
                 } else if (selectedReward == 1) {
                     // Attack +1 (weapon damage +1) * multiplier
                     playerChar.weaponDamage += 1 * rewardMultiplier;
@@ -1530,7 +1559,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 // Draw reward text
                 if (i == 0) {
                     DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +%d", 10 * rewardMultiplier);
-                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(No healing)");
+                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(+HP heal too)");
                     DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", playerChar.maxHP);
                 } else if (i == 1) {
                     DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +%d", 1 * rewardMultiplier);
