@@ -118,6 +118,7 @@ struct MapNode {
     std::vector<int> connectedNodes;  // Indices of connected nodes in next row
     bool visited;
     bool reachable;
+    int parentNodeIndex;  // Index of parent node in the path (-1 if none)
 };
 
 // Weapon type enum
@@ -245,7 +246,7 @@ unsigned int GetNodeColor(NodeType type) {
         case NODE_ELITE: return COLOR_ORANGE;
         case NODE_EVENT: return COLOR_BLUE;
         case NODE_SHOP: return COLOR_YELLOW;
-        case NODE_REST: return COLOR_PURPLE;
+        case NODE_REST: return COLOR_GREEN;
         case NODE_BOSS: return COLOR_RED;
         default: return COLOR_GRAY;
     }
@@ -478,6 +479,7 @@ std::vector<MapNode> GenerateMap() {
     startNode.type = NODE_START;
     startNode.visited = false;
     startNode.reachable = true;
+    startNode.parentNodeIndex = -1;  // Start node has no parent
     rowNodes[0].push_back(nodeIndex++);
     nodes.push_back(startNode);
     
@@ -493,6 +495,7 @@ std::vector<MapNode> GenerateMap() {
             node.col = col;
             node.visited = false;
             node.reachable = false;
+            node.parentNodeIndex = -1;  // Will be set when node is selected
             
             // Node type distribution: 70% normal, 10% elite, 10% event, 10% rest
             std::uniform_int_distribution<> typeDist(0, 99);
@@ -519,6 +522,7 @@ std::vector<MapNode> GenerateMap() {
     bossAnteRestNode.type = NODE_REST;
     bossAnteRestNode.visited = false;
     bossAnteRestNode.reachable = false;
+    bossAnteRestNode.parentNodeIndex = -1;  // Will be set when node is selected
     rowNodes[MAP_ROWS - 2].push_back(nodeIndex++);
     nodes.push_back(bossAnteRestNode);
     
@@ -529,6 +533,7 @@ std::vector<MapNode> GenerateMap() {
     bossNode.type = NODE_BOSS;
     bossNode.visited = false;
     bossNode.reachable = false;
+    bossNode.parentNodeIndex = -1;  // Will be set when node is selected
     rowNodes[MAP_ROWS - 1].push_back(nodeIndex++);
     nodes.push_back(bossNode);
     
@@ -602,25 +607,66 @@ std::vector<MapNode> GenerateMap() {
     return nodes;
 }
 
+// Helper function to draw an arrow from one point to another
+void DrawArrow(float x1, float y1, float x2, float y2, unsigned int color, float thickness) {
+    // Draw line from start to end
+    DrawLineAA(x1, y1, x2, y2, color, thickness);
+    
+    // Calculate arrowhead
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float length = sqrtf(dx * dx + dy * dy);
+    
+    if (length > 0.1f) {
+        float dirX = dx / length;
+        float dirY = dy / length;
+        
+        // Arrowhead parameters
+        float arrowHeadLen = 8.0f;
+        float arrowHeadAngle = 0.4f;  // radians
+        
+        // Calculate arrowhead points
+        float headX1 = x2 - dirX * arrowHeadLen * cosf(arrowHeadAngle) + dirY * arrowHeadLen * sinf(arrowHeadAngle);
+        float headY1 = y2 - dirY * arrowHeadLen * cosf(arrowHeadAngle) - dirX * arrowHeadLen * sinf(arrowHeadAngle);
+        float headX2 = x2 - dirX * arrowHeadLen * cosf(arrowHeadAngle) - dirY * arrowHeadLen * sinf(arrowHeadAngle);
+        float headY2 = y2 - dirY * arrowHeadLen * cosf(arrowHeadAngle) + dirX * arrowHeadLen * sinf(arrowHeadAngle);
+        
+        // Draw arrowhead
+        DrawLineAA(x2, y2, headX1, headY1, color, thickness);
+        DrawLineAA(x2, y2, headX2, headY2, color, thickness);
+    }
+}
+
 // Draw map scene
 void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highlightedNodeIndex) {
     // Draw title
     DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - Select Path");
     
-    // Draw edges first (behind nodes)
+    // Draw edges first (behind nodes) - basic gray edges
     for (size_t i = 0; i < nodes.size(); i++) {
         for (int connectedIdx : nodes[i].connectedNodes) {
-            unsigned int edgeColor = COLOR_GRAY;
-            
-            // Highlight edges from current node
-            if ((int)i == currentNodeIndex) {
-                edgeColor = COLOR_BLACK;
-            }
-            
             DrawLineAA(nodes[i].x, nodes[i].y, 
                       nodes[connectedIdx].x, nodes[connectedIdx].y, 
-                      edgeColor, 2.0f);
+                      COLOR_GRAY, 2.0f);
         }
+    }
+    
+    // Draw blue arrows for passed route (from start to current node)
+    int nodeIdx = currentNodeIndex;
+    while (nodeIdx != -1 && nodes[nodeIdx].parentNodeIndex != -1) {
+        int parentIdx = nodes[nodeIdx].parentNodeIndex;
+        DrawArrow(nodes[parentIdx].x, nodes[parentIdx].y,
+                 nodes[nodeIdx].x, nodes[nodeIdx].y,
+                 COLOR_BLUE, 3.0f);
+        nodeIdx = parentIdx;
+    }
+    
+    // Draw red arrows for path from current node to highlighted node
+    if (highlightedNodeIndex >= 0 && highlightedNodeIndex != currentNodeIndex && 
+        nodes[highlightedNodeIndex].reachable && !nodes[highlightedNodeIndex].visited) {
+        DrawArrow(nodes[currentNodeIndex].x, nodes[currentNodeIndex].y,
+                 nodes[highlightedNodeIndex].x, nodes[highlightedNodeIndex].y,
+                 COLOR_RED, 3.0f);
     }
     
     // Draw nodes
@@ -668,9 +714,10 @@ void UpdateReachability(std::vector<MapNode>& mapNodes, int currentNodeIndex) {
     for (size_t i = 0; i < mapNodes.size(); i++) {
         mapNodes[i].reachable = false;
     }
-    // Set connected nodes as reachable
+    // Set connected nodes as reachable and set parent
     for (int connectedIdx : mapNodes[currentNodeIndex].connectedNodes) {
         mapNodes[connectedIdx].reachable = true;
+        mapNodes[connectedIdx].parentNodeIndex = currentNodeIndex;
     }
 }
 
@@ -771,6 +818,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Update reachability from start
     for (int connectedIdx : mapNodes[0].connectedNodes) {
         mapNodes[connectedIdx].reachable = true;
+        mapNodes[connectedIdx].parentNodeIndex = 0;  // Set parent to start node
     }
     
     // Battle state
@@ -1346,6 +1394,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             mapNodes[0].visited = true;
                             for (int connectedIdx : mapNodes[0].connectedNodes) {
                                 mapNodes[connectedIdx].reachable = true;
+                                mapNodes[connectedIdx].parentNodeIndex = 0;  // Set parent to start node
                             }
                             
                             // Reset player
@@ -1370,6 +1419,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         mapNodes[0].visited = true;
                         for (int connectedIdx : mapNodes[0].connectedNodes) {
                             mapNodes[connectedIdx].reachable = true;
+                            mapNodes[connectedIdx].parentNodeIndex = 0;  // Set parent to start node
                         }
                         
                         // Reset player
@@ -1420,9 +1470,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
             }
             
-            // Draw K.O. text for dead players
+            // Draw dead characters as outlines and K.O. text
             for (int i = 0; i < 2; i++) {
                 if (!circles[i].isAlive) {
+                    // Draw only outline (transparent interior) for dead characters
+                    DrawCircleAA(circles[i].x, circles[i].y, CIRCLE_RADIUS, 32, COLOR_BLACK, FALSE);
+                    
+                    // Draw K.O. text
                     DrawFormatString((int)(circles[i].x + KO_TEXT_X_OFFSET), (int)(circles[i].y + KO_TEXT_Y_OFFSET), COLOR_BLACK, "K.O.");
                 }
             }
