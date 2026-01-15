@@ -1129,7 +1129,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     DrawLineAA(endX, endY, headX2, headY2, COLOR_YELLOW, 3.0f);
                 }
                 
-                // Draw enemy aim arrow (red, fixed initial direction)
+                // Draw enemy aim arrow (red)
                 float enemyCenterX = circles[1].x;
                 float enemyCenterY = circles[1].y;
                 float enemyVx = circles[1].vx;
