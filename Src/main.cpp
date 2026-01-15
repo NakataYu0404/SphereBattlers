@@ -29,7 +29,7 @@ const unsigned int COLOR_BEIGE = 0xF5F5DC;
 const unsigned int COLOR_YELLOW = 0xFFFF00;
 const unsigned int COLOR_CYAN = 0x00FFFF;
 const unsigned int COLOR_BLACK = 0x000000;
-const unsigned int COLOR_HIT_FEEDBACK = 0xFF6666;
+const unsigned int COLOR_HIT_FEEDBACK = 0xFF2222;
 const float HIT_FEEDBACK_DURATION = 10.0f;
 const int MAX_HP = 100;
 const int WEAPON_DAMAGE = 10;
@@ -76,7 +76,7 @@ const int NODE_PROB_EVENT = 80;     // 10% event nodes (70-80) (unused after sho
 const int NODE_PROB_REST = 90;      // 10% rest nodes (80-90) (unused after shop removal)
 const int NODE_PROB_SHOP = 90;      // 10% shop nodes (80-90) - UNUSED, shops removed
 // After shop removal: 70% normal, 10% elite, 10% event, 10% rest (hardcoded in GenerateMap)
-const unsigned int COLOR_RED = 0xFF0000;
+const unsigned int COLOR_RED = 0xFFAAAA;
 const unsigned int COLOR_GREEN = 0x00FF00;
 const unsigned int COLOR_BLUE = 0x0000FF;
 const unsigned int COLOR_PURPLE = 0x800080;
