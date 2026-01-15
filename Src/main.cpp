@@ -703,7 +703,7 @@ void DrawArrow(float x1, float y1, float x2, float y2, unsigned int color, float
 // Draw map scene
 void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highlightedNodeIndex) {
     // Draw title
-    DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - Select Path");
+    DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - S道を選んでね");
     
     // Get current row for comparison
     int currentRow = nodes[currentNodeIndex].row;
@@ -841,7 +841,7 @@ void ResetPlayerCharacter(Circle& playerChar) {
     
     // Reset weapon to initial defaults
     playerChar.weapon.type = WEAPON_SPEAR;
-    playerChar.weapon.offsetX = 40.0f;
+    playerChar.weapon.offsetX = 30.0f;
     playerChar.weapon.offsetY = 0.0f;
     playerChar.weapon.length = 25.0f;
     playerChar.weapon.color = COLOR_CYAN;
@@ -875,8 +875,8 @@ std::vector<std::string> GetCharacterSet(CharSetMode mode) {
             "n", "o", "p", "q", "r", "s", "t", "u", "v", "w",
             "x", "y", "z", "!", "?", ".", ",", "-", "_", "+",
             "=", "*", "/", "@", "#", "$", "%", "&", "(", ")",
-            "[", "]", "{", "}", "<", ">", ":", ";", "\"", "'",
-            "`", "~", "^", "|", "\\", "。", "、", "！", "？", "～"
+            "[", "]", "{", "}", "<", ">", ":", ";", "'", "`",
+            "~", "^", "|", " ", " ", " ", " ", " ", " ", " "
         };
         for (int i = 0; i < 50; i++) {
             chars.push_back(symbols[i]);
@@ -979,7 +979,7 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
         enemy.vy = -3.5f;
         enemy.angularVel = -0.025f;
         enemy.color = COLOR_RED;
-        enemy.weapon.offsetX = 45.0f;
+        enemy.weapon.offsetX = 30.0f;
         enemy.weapon.offsetY = 0.0f;
         enemy.weapon.color = COLOR_RED;
     } else if (nodeType == NODE_ELITE) {
@@ -991,7 +991,7 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
         enemy.maxHP = 30;
         enemy.hp = enemy.maxHP;
         enemy.weapon.type = WEAPON_SPEAR;
-        enemy.weapon.offsetX = 45.0f;
+        enemy.weapon.offsetX = 30.0f;
         enemy.weapon.offsetY = 0.0f;
         enemy.weapon.length = 30.0f;
         enemy.weapon.color = COLOR_RED;
@@ -1004,7 +1004,7 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
         enemy.maxHP = 10;
         enemy.hp = enemy.maxHP;
         enemy.weapon.type = WEAPON_SPEAR;
-        enemy.weapon.offsetX = 45.0f;
+        enemy.weapon.offsetX = 30.0f;
         enemy.weapon.offsetY = 0.0f;
         enemy.weapon.length = 30.0f;
         enemy.weapon.color = COLOR_RED;
@@ -1066,7 +1066,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     playerChar.color = COLOR_CYAN;
     playerChar.hp = MAX_HP;
     playerChar.weapon.type = WEAPON_SPEAR;
-    playerChar.weapon.offsetX = 40.0f;
+    playerChar.weapon.offsetX = 30.0f;
     playerChar.weapon.offsetY = 0.0f;
     playerChar.weapon.length = 25.0f;
     playerChar.weapon.color = COLOR_CYAN;
@@ -1904,7 +1904,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             // Draw UI
             DrawFormatString(SCREEN_WIDTH / 2 - 100, 100, COLOR_BLACK, "Congratulations!");
-            DrawFormatString(SCREEN_WIDTH / 2 - 140, 140, COLOR_BLACK, "名前を入力してください！");
+            DrawFormatString(SCREEN_WIDTH / 2 - 140, 140, COLOR_BLACK, "Enter Your Name!");
             
             // Draw input box
             const int INPUT_BOX_X = (SCREEN_WIDTH - NAME_ENTRY_INPUT_BOX_WIDTH) / 2;
@@ -1973,7 +1973,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     backX + NAME_ENTRY_CONTROL_BUTTON_WIDTH, 
                     NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT, 
                     COLOR_BLACK, FALSE);
-            DrawFormatString(backX + 15, NAME_ENTRY_CONTROL_BUTTON_Y + 12, COLOR_BLACK, "削除");
+            DrawFormatString(backX + 15, NAME_ENTRY_CONTROL_BUTTON_Y + 12, COLOR_BLACK, "Delete");
             
             // Clear
             int clearX = backX + NAME_ENTRY_CONTROL_BUTTON_WIDTH + 15;
@@ -1985,7 +1985,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     clearX + NAME_ENTRY_CONTROL_BUTTON_WIDTH, 
                     NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT, 
                     COLOR_BLACK, FALSE);
-            DrawFormatString(clearX + 10, NAME_ENTRY_CONTROL_BUTTON_Y + 12, COLOR_BLACK, "クリア");
+            DrawFormatString(clearX + 10, NAME_ENTRY_CONTROL_BUTTON_Y + 12, COLOR_BLACK, "Clear");
             
             // OK
             int okX = clearX + NAME_ENTRY_CONTROL_BUTTON_WIDTH + 15;
