@@ -1795,7 +1795,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     
                     if (mouseX >= keyX && mouseX <= keyX + NAME_ENTRY_KEY_WIDTH &&
                         mouseY >= keyY && mouseY <= keyY + NAME_ENTRY_KEY_HEIGHT) {
-                        // Add character if not at max length
+                        // Add character if not at max byte length (std::string::length() returns bytes)
                         if ((int)enteredName.length() < NAME_MAX_LENGTH) {
                             enteredName += charSet[i];
                         }
@@ -1894,7 +1894,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 RemoveLastCharacterUTF8(enteredName);
             }
             
-            // Check for alphanumeric keys (A-Z, 0-9)
+            // Check for alphanumeric keys (A-Z, 0-9) - physical keyboard input
+            // Note: length() returns byte count, which is correct for NAME_MAX_LENGTH (20 bytes)
             if ((int)enteredName.length() < NAME_MAX_LENGTH) {
                 for (int key = KEY_INPUT_A; key <= KEY_INPUT_Z; key++) {
                     static bool prevKeyStates[26] = {false};
