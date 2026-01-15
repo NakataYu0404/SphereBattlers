@@ -8,6 +8,7 @@
 #include <windows.h>
 #include <cmath>
 #include <vector>
+#include <string>
 #include <random>
 #include <fstream>
 #include <algorithm>
@@ -100,13 +101,31 @@ const int GAME_OVER_OPTION_SPACING = 30;
 const int GAME_OVER_OPTION_START_Y = 300;
 const int GAME_OVER_NUM_OPTIONS = 2;
 
+// Name entry screen constants
+const int NAME_ENTRY_KEY_WIDTH = 40;
+const int NAME_ENTRY_KEY_HEIGHT = 40;
+const int NAME_ENTRY_KEY_SPACING = 5;
+const int NAME_ENTRY_KEYS_PER_ROW = 10;
+const int NAME_ENTRY_KEYBOARD_START_Y = 320;
+const int NAME_ENTRY_INPUT_BOX_Y = 250;
+const int NAME_ENTRY_INPUT_BOX_WIDTH = 400;
+const int NAME_ENTRY_INPUT_BOX_HEIGHT = 40;
+const int NAME_ENTRY_MODE_BUTTON_WIDTH = 80;
+const int NAME_ENTRY_MODE_BUTTON_HEIGHT = 35;
+const int NAME_ENTRY_MODE_BUTTON_Y = 180;
+const int NAME_ENTRY_CONTROL_BUTTON_WIDTH = 90;
+const int NAME_ENTRY_CONTROL_BUTTON_HEIGHT = 40;
+const int NAME_ENTRY_CONTROL_BUTTON_Y = 580;
+const int NAME_MAX_LENGTH = 20;
+
 // Scene enum
 enum Scene {
     SCENE_TITLE,
     SCENE_MAP,
     SCENE_BATTLE,
     SCENE_REWARD,
-    SCENE_GAME_OVER
+    SCENE_GAME_OVER,
+    SCENE_NAME_ENTRY
 };
 
 // Battle phase enum
@@ -171,6 +190,7 @@ struct Circle {
     float hitCooldown;  // Cooldown timer before can be hit again (counts down)
     bool wasHitLastFrame;  // Track if was being hit last frame (for separation detection)
     float critRate;     // Critical hit rate (0.0 to 1.0)
+    std::string name;   // Boss name (for persistence)
 };
 
 // Helper function to clamp HP to valid range
@@ -227,6 +247,7 @@ void SaveBossToJSON(const Circle& player) {
         j["baseSpeed"] = player.baseSpeed;
         j["weaponType"] = (int)player.weapon.type;
         j["weaponLength"] = player.weapon.length;
+        j["name"] = player.name;
         
         std::ofstream file(BOSS_SAVE_FILE);
         if (file.is_open()) {
@@ -267,6 +288,7 @@ bool LoadBossFromJSON(Circle& boss) {
         boss.weapon.type = (WeaponType)weaponTypeInt;
         
         boss.weapon.length = j.value("weaponLength", 30.0f);
+        boss.name = j.value("name", std::string("Boss"));
         
         return true;
     } catch (...) {
@@ -807,6 +829,71 @@ void ResetPlayerCharacter(Circle& playerChar) {
     playerChar.critRate = 0.0f;
 }
 
+// Character set mode enum
+enum CharSetMode {
+    CHARSET_HIRAGANA,
+    CHARSET_KATAKANA,
+    CHARSET_ENGLISH,
+    CHARSET_SYMBOLS
+};
+
+// Get character set based on mode
+std::vector<std::string> GetCharacterSet(CharSetMode mode) {
+    std::vector<std::string> chars;
+    
+    if (mode == CHARSET_HIRAGANA) {
+        // Hiragana characters
+        const char* hiragana[] = {
+            "あ", "い", "う", "え", "お", "か", "き", "く", "け", "こ",
+            "さ", "し", "す", "せ", "そ", "た", "ち", "つ", "て", "と",
+            "な", "に", "ぬ", "ね", "の", "は", "ひ", "ふ", "へ", "ほ",
+            "ま", "み", "む", "め", "も", "や", "ゆ", "よ", "ら", "り",
+            "る", "れ", "ろ", "わ", "を", "ん", "が", "ぎ", "ぐ", "げ"
+        };
+        for (int i = 0; i < 50; i++) {
+            chars.push_back(hiragana[i]);
+        }
+    } else if (mode == CHARSET_KATAKANA) {
+        // Katakana characters
+        const char* katakana[] = {
+            "ア", "イ", "ウ", "エ", "オ", "カ", "キ", "ク", "ケ", "コ",
+            "サ", "シ", "ス", "セ", "ソ", "タ", "チ", "ツ", "テ", "ト",
+            "ナ", "ニ", "ヌ", "ネ", "ノ", "ハ", "ヒ", "フ", "ヘ", "ホ",
+            "マ", "ミ", "ム", "メ", "モ", "ヤ", "ユ", "ヨ", "ラ", "リ",
+            "ル", "レ", "ロ", "ワ", "ヲ", "ン", "ガ", "ギ", "グ", "ゲ"
+        };
+        for (int i = 0; i < 50; i++) {
+            chars.push_back(katakana[i]);
+        }
+    } else if (mode == CHARSET_ENGLISH) {
+        // English alphabet and numbers
+        const char* english[] = {
+            "A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
+            "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
+            "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d",
+            "e", "f", "g", "h", "i", "j", "k", "l", "m", "n",
+            "o", "p", "q", "r", "s", "t", "u", "v", "w", "x"
+        };
+        for (int i = 0; i < 50; i++) {
+            chars.push_back(english[i]);
+        }
+    } else if (mode == CHARSET_SYMBOLS) {
+        // Symbols and numbers
+        const char* symbols[] = {
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+            "!", "?", ".", ",", "-", "_", "+", "=", "*", "/",
+            "@", "#", "$", "%", "&", "(", ")", "[", "]", "{",
+            "}", "<", ">", ":", ";", "\"", "'", "`", "~", "^",
+            "|", "\\", " ", "y", "z", "。", "、", "！", "？", "～"
+        };
+        for (int i = 0; i < 50; i++) {
+            chars.push_back(symbols[i]);
+        }
+    }
+    
+    return chars;
+}
+
 // Draw title screen
 void DrawTitleScreen() {
     // Draw title
@@ -879,6 +966,7 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
             enemy.hp = enemy.maxHP;
             enemy.weapon.type = WEAPON_SPEAR;
             enemy.weapon.length = 30.0f;
+            enemy.name = "Boss";
         }
         // Always set these defaults for boss (not persisted in save)
         enemy.vx = -2.0f;
@@ -1411,34 +1499,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         playerChar.vy = circles[0].vy;
                         playerChar.angularVel = circles[0].angularVel;
                         
-                        // If defeated boss, save to JSON
-                        if (mapNodes[currentNodeIndex].type == NODE_BOSS) {
-                            SaveBossToJSON(playerChar);
-                        }
-                        
                         // Check if reached boss (end of run)
                         if (mapNodes[currentNodeIndex].type == NODE_BOSS) {
-                            // Run completed - could show victory screen or restart
-                            // For now, just generate a new map
-                            mapNodes = GenerateMap();
-                            currentNodeIndex = 0;
-                            highlightedNodeIndex = 0;
-                            mapNodes[0].visited = true;
-                            for (int connectedIdx : mapNodes[0].connectedNodes) {
-                                mapNodes[connectedIdx].reachable = true;
-                                mapNodes[connectedIdx].parentNodeIndex = 0;  // Set parent to start node
-                            }
-                            
-                            // Reset player
-                            playerChar.hp = MAX_HP;
-                            playerChar.maxHP = MAX_HP;
-                            playerChar.weaponDamage = 0;
-                            playerChar.baseSpeed = 1.0f;
-                            playerChar.critRate = 0.0f;
-                            
-                            // Set input cooldown and clear input state before returning to map
+                            // Boss defeated - transition to name entry screen
                             ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
-                            currentScene = SCENE_MAP;
+                            currentScene = SCENE_NAME_ENTRY;
                         } else {
                             // Transition to reward selection scene
                             ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
@@ -1673,6 +1738,273 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             // Draw instructions
             DrawFormatString(SCREEN_WIDTH / 2 - 80, 450, COLOR_BLACK, "Mouse: Click on reward");
+        } else if (currentScene == SCENE_NAME_ENTRY) {
+            // ===== NAME ENTRY SCENE =====
+            
+            // Name entry state (persistent across frames in this scene)
+            static std::string enteredName = "";
+            static CharSetMode charSetMode = CHARSET_HIRAGANA;
+            static bool nameEntryInitialized = false;
+            
+            // Initialize name entry scene on first entry
+            if (!nameEntryInitialized) {
+                enteredName = "";
+                charSetMode = CHARSET_HIRAGANA;
+                nameEntryInitialized = true;
+            }
+            
+            // Update input cooldown timer
+            if (mapInputCooldown > 0.0f) {
+                mapInputCooldown -= 1.0f;
+            }
+            
+            // Get current character set
+            std::vector<std::string> charSet = GetCharacterSet(charSetMode);
+            
+            // Handle mouse input
+            int mouseX, mouseY;
+            GetMousePoint(&mouseX, &mouseY);
+            int mouseState = GetMouseInput();
+            bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
+            
+            // Calculate keyboard layout
+            const int KEYBOARD_START_X = (SCREEN_WIDTH - (NAME_ENTRY_KEYS_PER_ROW * (NAME_ENTRY_KEY_WIDTH + NAME_ENTRY_KEY_SPACING) - NAME_ENTRY_KEY_SPACING)) / 2;
+            
+            // Handle character key clicks
+            if (mouseClicked && mapInputCooldown <= 0.0f) {
+                // Check keyboard keys
+                for (size_t i = 0; i < charSet.size(); i++) {
+                    int row = i / NAME_ENTRY_KEYS_PER_ROW;
+                    int col = i % NAME_ENTRY_KEYS_PER_ROW;
+                    int keyX = KEYBOARD_START_X + col * (NAME_ENTRY_KEY_WIDTH + NAME_ENTRY_KEY_SPACING);
+                    int keyY = NAME_ENTRY_KEYBOARD_START_Y + row * (NAME_ENTRY_KEY_HEIGHT + NAME_ENTRY_KEY_SPACING);
+                    
+                    if (mouseX >= keyX && mouseX <= keyX + NAME_ENTRY_KEY_WIDTH &&
+                        mouseY >= keyY && mouseY <= keyY + NAME_ENTRY_KEY_HEIGHT) {
+                        // Add character if not at max length
+                        if ((int)enteredName.length() < NAME_MAX_LENGTH) {
+                            enteredName += charSet[i];
+                        }
+                    }
+                }
+                
+                // Check mode switch buttons
+                const int MODE_BUTTON_START_X = (SCREEN_WIDTH - (4 * NAME_ENTRY_MODE_BUTTON_WIDTH + 3 * NAME_ENTRY_KEY_SPACING)) / 2;
+                
+                // Hiragana button
+                int hiraX = MODE_BUTTON_START_X;
+                if (mouseX >= hiraX && mouseX <= hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH &&
+                    mouseY >= NAME_ENTRY_MODE_BUTTON_Y && mouseY <= NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT) {
+                    charSetMode = CHARSET_HIRAGANA;
+                }
+                
+                // Katakana button
+                int kataX = hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
+                if (mouseX >= kataX && mouseX <= kataX + NAME_ENTRY_MODE_BUTTON_WIDTH &&
+                    mouseY >= NAME_ENTRY_MODE_BUTTON_Y && mouseY <= NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT) {
+                    charSetMode = CHARSET_KATAKANA;
+                }
+                
+                // English button
+                int engX = kataX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
+                if (mouseX >= engX && mouseX <= engX + NAME_ENTRY_MODE_BUTTON_WIDTH &&
+                    mouseY >= NAME_ENTRY_MODE_BUTTON_Y && mouseY <= NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT) {
+                    charSetMode = CHARSET_ENGLISH;
+                }
+                
+                // Symbols button
+                int symX = engX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
+                if (mouseX >= symX && mouseX <= symX + NAME_ENTRY_MODE_BUTTON_WIDTH &&
+                    mouseY >= NAME_ENTRY_MODE_BUTTON_Y && mouseY <= NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT) {
+                    charSetMode = CHARSET_SYMBOLS;
+                }
+                
+                // Check control buttons
+                const int CONTROL_BUTTON_START_X = (SCREEN_WIDTH - (3 * NAME_ENTRY_CONTROL_BUTTON_WIDTH + 2 * 15)) / 2;
+                
+                // Backspace button
+                int backX = CONTROL_BUTTON_START_X;
+                if (mouseX >= backX && mouseX <= backX + NAME_ENTRY_CONTROL_BUTTON_WIDTH &&
+                    mouseY >= NAME_ENTRY_CONTROL_BUTTON_Y && mouseY <= NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT) {
+                    if (enteredName.length() > 0) {
+                        // Remove last character (handle multi-byte UTF-8)
+                        while (enteredName.length() > 0 && (enteredName.back() & 0xC0) == 0x80) {
+                            enteredName.pop_back();
+                        }
+                        if (enteredName.length() > 0) {
+                            enteredName.pop_back();
+                        }
+                    }
+                }
+                
+                // Clear button
+                int clearX = backX + NAME_ENTRY_CONTROL_BUTTON_WIDTH + 15;
+                if (mouseX >= clearX && mouseX <= clearX + NAME_ENTRY_CONTROL_BUTTON_WIDTH &&
+                    mouseY >= NAME_ENTRY_CONTROL_BUTTON_Y && mouseY <= NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT) {
+                    enteredName = "";
+                }
+                
+                // OK button
+                int okX = clearX + NAME_ENTRY_CONTROL_BUTTON_WIDTH + 15;
+                if (mouseX >= okX && mouseX <= okX + NAME_ENTRY_CONTROL_BUTTON_WIDTH &&
+                    mouseY >= NAME_ENTRY_CONTROL_BUTTON_Y && mouseY <= NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT) {
+                    // Save boss with name and return to title
+                    if (enteredName.empty()) {
+                        playerChar.name = "Boss";
+                    } else {
+                        playerChar.name = enteredName;
+                    }
+                    SaveBossToJSON(playerChar);
+                    
+                    // Reset for next run
+                    mapNodes = GenerateMap();
+                    currentNodeIndex = 0;
+                    highlightedNodeIndex = 0;
+                    mapNodes[0].visited = true;
+                    for (int connectedIdx : mapNodes[0].connectedNodes) {
+                        mapNodes[connectedIdx].reachable = true;
+                        mapNodes[connectedIdx].parentNodeIndex = 0;
+                    }
+                    
+                    // Reset player
+                    playerChar.hp = MAX_HP;
+                    playerChar.maxHP = MAX_HP;
+                    playerChar.weaponDamage = 0;
+                    playerChar.baseSpeed = 1.0f;
+                    playerChar.critRate = 0.0f;
+                    
+                    // Reset name entry state for next time
+                    nameEntryInitialized = false;
+                    
+                    // Return to title
+                    currentScene = SCENE_TITLE;
+                }
+            }
+            
+            prevMouseState = mouseState;
+            
+            // Draw UI
+            DrawFormatString(SCREEN_WIDTH / 2 - 100, 100, COLOR_BLACK, "Congratulations!");
+            DrawFormatString(SCREEN_WIDTH / 2 - 140, 140, COLOR_BLACK, "名前を入力してください！");
+            
+            // Draw input box
+            const int INPUT_BOX_X = (SCREEN_WIDTH - NAME_ENTRY_INPUT_BOX_WIDTH) / 2;
+            DrawBox(INPUT_BOX_X, NAME_ENTRY_INPUT_BOX_Y, 
+                    INPUT_BOX_X + NAME_ENTRY_INPUT_BOX_WIDTH, 
+                    NAME_ENTRY_INPUT_BOX_Y + NAME_ENTRY_INPUT_BOX_HEIGHT, 
+                    COLOR_WHITE, TRUE);
+            DrawBox(INPUT_BOX_X, NAME_ENTRY_INPUT_BOX_Y, 
+                    INPUT_BOX_X + NAME_ENTRY_INPUT_BOX_WIDTH, 
+                    NAME_ENTRY_INPUT_BOX_Y + NAME_ENTRY_INPUT_BOX_HEIGHT, 
+                    COLOR_BLACK, FALSE);
+            DrawFormatString(INPUT_BOX_X + 10, NAME_ENTRY_INPUT_BOX_Y + 10, COLOR_BLACK, "%s", enteredName.c_str());
+            
+            // Draw mode buttons
+            const int MODE_BUTTON_START_X = (SCREEN_WIDTH - (4 * NAME_ENTRY_MODE_BUTTON_WIDTH + 3 * NAME_ENTRY_KEY_SPACING)) / 2;
+            
+            // Hiragana
+            int hiraX = MODE_BUTTON_START_X;
+            unsigned int hiraColor = (charSetMode == CHARSET_HIRAGANA) ? COLOR_YELLOW : COLOR_WHITE;
+            DrawBox(hiraX, NAME_ENTRY_MODE_BUTTON_Y, 
+                    hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
+                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
+                    hiraColor, TRUE);
+            DrawBox(hiraX, NAME_ENTRY_MODE_BUTTON_Y, 
+                    hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
+                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
+                    COLOR_BLACK, FALSE);
+            DrawFormatString(hiraX + 8, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "ひらがな");
+            
+            // Katakana
+            int kataX = hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
+            unsigned int kataColor = (charSetMode == CHARSET_KATAKANA) ? COLOR_YELLOW : COLOR_WHITE;
+            DrawBox(kataX, NAME_ENTRY_MODE_BUTTON_Y, 
+                    kataX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
+                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
+                    kataColor, TRUE);
+            DrawBox(kataX, NAME_ENTRY_MODE_BUTTON_Y, 
+                    kataX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
+                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
+                    COLOR_BLACK, FALSE);
+            DrawFormatString(kataX + 8, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "カタカナ");
+            
+            // English
+            int engX = kataX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
+            unsigned int engColor = (charSetMode == CHARSET_ENGLISH) ? COLOR_YELLOW : COLOR_WHITE;
+            DrawBox(engX, NAME_ENTRY_MODE_BUTTON_Y, 
+                    engX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
+                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
+                    engColor, TRUE);
+            DrawBox(engX, NAME_ENTRY_MODE_BUTTON_Y, 
+                    engX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
+                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
+                    COLOR_BLACK, FALSE);
+            DrawFormatString(engX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "英語");
+            
+            // Symbols
+            int symX = engX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
+            unsigned int symColor = (charSetMode == CHARSET_SYMBOLS) ? COLOR_YELLOW : COLOR_WHITE;
+            DrawBox(symX, NAME_ENTRY_MODE_BUTTON_Y, 
+                    symX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
+                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
+                    symColor, TRUE);
+            DrawBox(symX, NAME_ENTRY_MODE_BUTTON_Y, 
+                    symX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
+                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
+                    COLOR_BLACK, FALSE);
+            DrawFormatString(symX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "記号");
+            
+            // Draw keyboard
+            for (size_t i = 0; i < charSet.size(); i++) {
+                int row = i / NAME_ENTRY_KEYS_PER_ROW;
+                int col = i % NAME_ENTRY_KEYS_PER_ROW;
+                int keyX = KEYBOARD_START_X + col * (NAME_ENTRY_KEY_WIDTH + NAME_ENTRY_KEY_SPACING);
+                int keyY = NAME_ENTRY_KEYBOARD_START_Y + row * (NAME_ENTRY_KEY_HEIGHT + NAME_ENTRY_KEY_SPACING);
+                
+                // Draw key
+                DrawBox(keyX, keyY, keyX + NAME_ENTRY_KEY_WIDTH, keyY + NAME_ENTRY_KEY_HEIGHT, COLOR_WHITE, TRUE);
+                DrawBox(keyX, keyY, keyX + NAME_ENTRY_KEY_WIDTH, keyY + NAME_ENTRY_KEY_HEIGHT, COLOR_BLACK, FALSE);
+                DrawFormatString(keyX + 12, keyY + 12, COLOR_BLACK, "%s", charSet[i].c_str());
+            }
+            
+            // Draw control buttons
+            const int CONTROL_BUTTON_START_X = (SCREEN_WIDTH - (3 * NAME_ENTRY_CONTROL_BUTTON_WIDTH + 2 * 15)) / 2;
+            
+            // Backspace
+            int backX = CONTROL_BUTTON_START_X;
+            DrawBox(backX, NAME_ENTRY_CONTROL_BUTTON_Y, 
+                    backX + NAME_ENTRY_CONTROL_BUTTON_WIDTH, 
+                    NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT, 
+                    COLOR_WHITE, TRUE);
+            DrawBox(backX, NAME_ENTRY_CONTROL_BUTTON_Y, 
+                    backX + NAME_ENTRY_CONTROL_BUTTON_WIDTH, 
+                    NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT, 
+                    COLOR_BLACK, FALSE);
+            DrawFormatString(backX + 15, NAME_ENTRY_CONTROL_BUTTON_Y + 12, COLOR_BLACK, "削除");
+            
+            // Clear
+            int clearX = backX + NAME_ENTRY_CONTROL_BUTTON_WIDTH + 15;
+            DrawBox(clearX, NAME_ENTRY_CONTROL_BUTTON_Y, 
+                    clearX + NAME_ENTRY_CONTROL_BUTTON_WIDTH, 
+                    NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT, 
+                    COLOR_WHITE, TRUE);
+            DrawBox(clearX, NAME_ENTRY_CONTROL_BUTTON_Y, 
+                    clearX + NAME_ENTRY_CONTROL_BUTTON_WIDTH, 
+                    NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT, 
+                    COLOR_BLACK, FALSE);
+            DrawFormatString(clearX + 10, NAME_ENTRY_CONTROL_BUTTON_Y + 12, COLOR_BLACK, "クリア");
+            
+            // OK
+            int okX = clearX + NAME_ENTRY_CONTROL_BUTTON_WIDTH + 15;
+            DrawBox(okX, NAME_ENTRY_CONTROL_BUTTON_Y, 
+                    okX + NAME_ENTRY_CONTROL_BUTTON_WIDTH, 
+                    NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT, 
+                    COLOR_GREEN, TRUE);
+            DrawBox(okX, NAME_ENTRY_CONTROL_BUTTON_Y, 
+                    okX + NAME_ENTRY_CONTROL_BUTTON_WIDTH, 
+                    NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT, 
+                    COLOR_BLACK, FALSE);
+            DrawFormatString(okX + 30, NAME_ENTRY_CONTROL_BUTTON_Y + 12, COLOR_BLACK, "OK");
         }
         
         ScreenFlip();
