@@ -1602,7 +1602,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     if (playerChar.critRate > 1.0f) playerChar.critRate = 1.0f;
                 } else if (selectedReward == 4) {
                     // Weapon length +5 * multiplier
-                    playerChar.weapon.length += 5.0f * rewardMultiplier;
+                    playerChar.weapon.length += 15.0f * rewardMultiplier;
                 }
                 
                 // Reset reward scene for next time
