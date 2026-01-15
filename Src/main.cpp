@@ -216,6 +216,10 @@ bool LoadBossFromJSON(Circle& boss) {
         
         // Load boss parameters with validation and defaults
         boss.maxHP = j.value("maxHP", MAX_HP);
+        // Ensure maxHP is positive (fallback to default if invalid)
+        if (boss.maxHP <= 0) {
+            boss.maxHP = MAX_HP;
+        }
         boss.hp = boss.maxHP;  // Set current HP to maxHP on load
         boss.weaponDamage = j.value("weaponDamage", 0);
         boss.baseSpeed = j.value("baseSpeed", 1.0f);
