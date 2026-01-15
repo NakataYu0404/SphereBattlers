@@ -753,7 +753,7 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
         // Highlight current node
         if ((int)i == currentNodeIndex) {
             DrawCircleAA(nodes[i].x, nodes[i].y, MAP_NODE_RADIUS + 3, 32, COLOR_WHITE, FALSE);
-            DrawCircleAA(nodes[i].x, nodes[i].y, MAP_NODE_RADIUS + 5, 32, COLOR_BLACK, FALSE);
+            DrawCircleAA(nodes[i].x, nodes[i].y, MAP_NODE_RADIUS + 5, 32, COLOR_CYAN, FALSE);
         }
         
         // Highlight hovered/selected node
