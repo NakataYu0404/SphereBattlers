@@ -834,8 +834,6 @@ void ResetPlayerCharacter(Circle& playerChar) {
 
 // Character set mode enum
 enum CharSetMode {
-    CHARSET_HIRAGANA,
-    CHARSET_KATAKANA,
     CHARSET_ENGLISH,
     CHARSET_SYMBOLS
 };
@@ -844,31 +842,7 @@ enum CharSetMode {
 std::vector<std::string> GetCharacterSet(CharSetMode mode) {
     std::vector<std::string> chars;
     
-    if (mode == CHARSET_HIRAGANA) {
-        // Hiragana characters
-        const char* hiragana[] = {
-            "あ", "い", "う", "え", "お", "か", "き", "く", "け", "こ",
-            "さ", "し", "す", "せ", "そ", "た", "ち", "つ", "て", "と",
-            "な", "に", "ぬ", "ね", "の", "は", "ひ", "ふ", "へ", "ほ",
-            "ま", "み", "む", "め", "も", "や", "ゆ", "よ", "ら", "り",
-            "る", "れ", "ろ", "わ", "を", "ん", "が", "ぎ", "ぐ", "げ"
-        };
-        for (int i = 0; i < 50; i++) {
-            chars.push_back(hiragana[i]);
-        }
-    } else if (mode == CHARSET_KATAKANA) {
-        // Katakana characters
-        const char* katakana[] = {
-            "ア", "イ", "ウ", "エ", "オ", "カ", "キ", "ク", "ケ", "コ",
-            "サ", "シ", "ス", "セ", "ソ", "タ", "チ", "ツ", "テ", "ト",
-            "ナ", "ニ", "ヌ", "ネ", "ノ", "ハ", "ヒ", "フ", "ヘ", "ホ",
-            "マ", "ミ", "ム", "メ", "モ", "ヤ", "ユ", "ヨ", "ラ", "リ",
-            "ル", "レ", "ロ", "ワ", "ヲ", "ン", "ガ", "ギ", "グ", "ゲ"
-        };
-        for (int i = 0; i < 50; i++) {
-            chars.push_back(katakana[i]);
-        }
-    } else if (mode == CHARSET_ENGLISH) {
+    if (mode == CHARSET_ENGLISH) {
         // English alphabet (uppercase + lowercase) and numbers
         const char* english[] = {
             "A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
@@ -1760,13 +1734,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             // Name entry state (persistent across frames in this scene)
             static std::string enteredName = "";
-            static CharSetMode charSetMode = CHARSET_HIRAGANA;
+            static CharSetMode charSetMode = CHARSET_ENGLISH;
             static bool nameEntryInitialized = false;
             
             // Initialize name entry scene on first entry
             if (!nameEntryInitialized) {
                 enteredName = "";
-                charSetMode = CHARSET_HIRAGANA;
+                charSetMode = CHARSET_ENGLISH;
                 nameEntryInitialized = true;
             }
             
@@ -1806,24 +1780,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
                 
                 // Check mode switch buttons
-                const int MODE_BUTTON_START_X = (SCREEN_WIDTH - (4 * NAME_ENTRY_MODE_BUTTON_WIDTH + 3 * NAME_ENTRY_KEY_SPACING)) / 2;
-                
-                // Hiragana button
-                int hiraX = MODE_BUTTON_START_X;
-                if (mouseX >= hiraX && mouseX <= hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH &&
-                    mouseY >= NAME_ENTRY_MODE_BUTTON_Y && mouseY <= NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT) {
-                    charSetMode = CHARSET_HIRAGANA;
-                }
-                
-                // Katakana button
-                int kataX = hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
-                if (mouseX >= kataX && mouseX <= kataX + NAME_ENTRY_MODE_BUTTON_WIDTH &&
-                    mouseY >= NAME_ENTRY_MODE_BUTTON_Y && mouseY <= NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT) {
-                    charSetMode = CHARSET_KATAKANA;
-                }
+                const int MODE_BUTTON_START_X = (SCREEN_WIDTH - (2 * NAME_ENTRY_MODE_BUTTON_WIDTH + 1 * NAME_ENTRY_KEY_SPACING)) / 2;
                 
                 // English button
-                int engX = kataX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
+                int engX = MODE_BUTTON_START_X;
                 if (mouseX >= engX && mouseX <= engX + NAME_ENTRY_MODE_BUTTON_WIDTH &&
                     mouseY >= NAME_ENTRY_MODE_BUTTON_Y && mouseY <= NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT) {
                     charSetMode = CHARSET_ENGLISH;
@@ -1939,36 +1899,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             DrawFormatString(INPUT_BOX_X + 10, NAME_ENTRY_INPUT_BOX_Y + 10, COLOR_BLACK, "%s", enteredName.c_str());
             
             // Draw mode buttons
-            const int MODE_BUTTON_START_X = (SCREEN_WIDTH - (4 * NAME_ENTRY_MODE_BUTTON_WIDTH + 3 * NAME_ENTRY_KEY_SPACING)) / 2;
-            
-            // Hiragana
-            int hiraX = MODE_BUTTON_START_X;
-            unsigned int hiraColor = (charSetMode == CHARSET_HIRAGANA) ? COLOR_YELLOW : COLOR_WHITE;
-            DrawBox(hiraX, NAME_ENTRY_MODE_BUTTON_Y, 
-                    hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
-                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
-                    hiraColor, TRUE);
-            DrawBox(hiraX, NAME_ENTRY_MODE_BUTTON_Y, 
-                    hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
-                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
-                    COLOR_BLACK, FALSE);
-            DrawFormatString(hiraX + 8, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "ひらがな");
-            
-            // Katakana
-            int kataX = hiraX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
-            unsigned int kataColor = (charSetMode == CHARSET_KATAKANA) ? COLOR_YELLOW : COLOR_WHITE;
-            DrawBox(kataX, NAME_ENTRY_MODE_BUTTON_Y, 
-                    kataX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
-                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
-                    kataColor, TRUE);
-            DrawBox(kataX, NAME_ENTRY_MODE_BUTTON_Y, 
-                    kataX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
-                    NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
-                    COLOR_BLACK, FALSE);
-            DrawFormatString(kataX + 8, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "カタカナ");
+            const int MODE_BUTTON_START_X = (SCREEN_WIDTH - (2 * NAME_ENTRY_MODE_BUTTON_WIDTH + 1 * NAME_ENTRY_KEY_SPACING)) / 2;
             
             // English
-            int engX = kataX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
+            int engX = MODE_BUTTON_START_X;
             unsigned int engColor = (charSetMode == CHARSET_ENGLISH) ? COLOR_YELLOW : COLOR_WHITE;
             DrawBox(engX, NAME_ENTRY_MODE_BUTTON_Y, 
                     engX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
@@ -1978,7 +1912,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     engX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
                     NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
                     COLOR_BLACK, FALSE);
-            DrawFormatString(engX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "英語");
+            DrawFormatString(engX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "English");
             
             // Symbols
             int symX = engX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
@@ -1991,7 +1925,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     symX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
                     NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
                     COLOR_BLACK, FALSE);
-            DrawFormatString(symX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "記号");
+            DrawFormatString(symX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "Symbols");
             
             // Draw keyboard
             for (size_t i = 0; i < charSet.size(); i++) {
