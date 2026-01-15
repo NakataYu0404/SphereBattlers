@@ -1881,6 +1881,41 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
             }
             
+            // Handle physical keyboard input as fallback (for English characters)
+            static bool prevBackspaceKey = false;
+            bool backspacePressed = DetectKeyPressEdge(KEY_INPUT_BACK, prevBackspaceKey);
+            if (backspacePressed && enteredName.length() > 0) {
+                // Remove last character (handle multi-byte UTF-8)
+                while (enteredName.length() > 0 && (enteredName.back() & 0xC0) == 0x80) {
+                    enteredName.pop_back();
+                }
+                if (enteredName.length() > 0) {
+                    enteredName.pop_back();
+                }
+            }
+            
+            // Check for alphanumeric keys (A-Z, 0-9)
+            if ((int)enteredName.length() < NAME_MAX_LENGTH) {
+                for (int key = KEY_INPUT_A; key <= KEY_INPUT_Z; key++) {
+                    static bool prevKeyStates[26] = {false};
+                    int idx = key - KEY_INPUT_A;
+                    if (DetectKeyPressEdge(key, prevKeyStates[idx])) {
+                        char c = 'A' + idx;
+                        enteredName += c;
+                        break;
+                    }
+                }
+                for (int key = KEY_INPUT_0; key <= KEY_INPUT_9; key++) {
+                    static bool prevNumStates[10] = {false};
+                    int idx = key - KEY_INPUT_0;
+                    if (DetectKeyPressEdge(key, prevNumStates[idx])) {
+                        char c = '0' + idx;
+                        enteredName += c;
+                        break;
+                    }
+                }
+            }
+            
             prevMouseState = mouseState;
             
             // Draw UI
