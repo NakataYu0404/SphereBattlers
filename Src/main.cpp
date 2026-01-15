@@ -451,7 +451,7 @@ bool HandleWeaponCollision(Circle& c1, Circle& c2) {
     
     if (dist < WEAPON_COLLISION_THRESHOLD) {
         // Simple bounce: reverse angular velocities to make weapons separate
-        // No damping to prevent rotation slowdown over time
+        // No damping to prevent rotation slowdown during collisions
         c1.angularVel = -c1.angularVel;
         c2.angularVel = -c2.angularVel;
         
@@ -1559,7 +1559,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 // Draw reward text
                 if (i == 0) {
                     DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +%d", 10 * rewardMultiplier);
-                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(+HP heal too)");
+                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(+HP healing)");
                     DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", playerChar.maxHP);
                 } else if (i == 1) {
                     DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +%d", 1 * rewardMultiplier);
