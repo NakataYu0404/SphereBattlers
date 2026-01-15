@@ -872,7 +872,8 @@ std::vector<std::string> GetCharacterSet(CharSetMode mode) {
             "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
             "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d",
             "e", "f", "g", "h", "i", "j", "k", "l", "m", "n",
-            "o", "p", "q", "r", "s", "t", "u", "v", "w", "x"
+            "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
+            "y", "z", "0", "1", "2", "3", "4", "5", "6", "7"
         };
         for (int i = 0; i < 50; i++) {
             chars.push_back(english[i]);
@@ -880,11 +881,11 @@ std::vector<std::string> GetCharacterSet(CharSetMode mode) {
     } else if (mode == CHARSET_SYMBOLS) {
         // Symbols and numbers
         const char* symbols[] = {
-            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+            "8", "9", "0", "1", "2", "3", "4", "5", "6", "7",
             "!", "?", ".", ",", "-", "_", "+", "=", "*", "/",
             "@", "#", "$", "%", "&", "(", ")", "[", "]", "{",
             "}", "<", ">", ":", ";", "\"", "'", "`", "~", "^",
-            "|", "\\", " ", "y", "z", "。", "、", "！", "？", "～"
+            "|", "\\", " ", "。", "、", "！", "？", "～", "・", "…"
         };
         for (int i = 0; i < 50; i++) {
             chars.push_back(symbols[i]);
@@ -892,6 +893,20 @@ std::vector<std::string> GetCharacterSet(CharSetMode mode) {
     }
     
     return chars;
+}
+
+// Helper function to remove last character from UTF-8 string
+void RemoveLastCharacterUTF8(std::string& str) {
+    if (str.length() > 0) {
+        // Remove continuation bytes (10xxxxxx)
+        while (str.length() > 0 && (str.back() & 0xC0) == 0x80) {
+            str.pop_back();
+        }
+        // Remove the leading byte
+        if (str.length() > 0) {
+            str.pop_back();
+        }
+    }
 }
 
 // Draw title screen
@@ -1826,15 +1841,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 int backX = CONTROL_BUTTON_START_X;
                 if (mouseX >= backX && mouseX <= backX + NAME_ENTRY_CONTROL_BUTTON_WIDTH &&
                     mouseY >= NAME_ENTRY_CONTROL_BUTTON_Y && mouseY <= NAME_ENTRY_CONTROL_BUTTON_Y + NAME_ENTRY_CONTROL_BUTTON_HEIGHT) {
-                    if (enteredName.length() > 0) {
-                        // Remove last character (handle multi-byte UTF-8)
-                        while (enteredName.length() > 0 && (enteredName.back() & 0xC0) == 0x80) {
-                            enteredName.pop_back();
-                        }
-                        if (enteredName.length() > 0) {
-                            enteredName.pop_back();
-                        }
-                    }
+                    RemoveLastCharacterUTF8(enteredName);
                 }
                 
                 // Clear button
@@ -1884,14 +1891,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             // Handle physical keyboard input as fallback (for English characters)
             static bool prevBackspaceKey = false;
             bool backspacePressed = DetectKeyPressEdge(KEY_INPUT_BACK, prevBackspaceKey);
-            if (backspacePressed && enteredName.length() > 0) {
-                // Remove last character (handle multi-byte UTF-8)
-                while (enteredName.length() > 0 && (enteredName.back() & 0xC0) == 0x80) {
-                    enteredName.pop_back();
-                }
-                if (enteredName.length() > 0) {
-                    enteredName.pop_back();
-                }
+            if (backspacePressed) {
+                RemoveLastCharacterUTF8(enteredName);
             }
             
             // Check for alphanumeric keys (A-Z, 0-9)
