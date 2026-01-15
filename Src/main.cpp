@@ -190,10 +190,7 @@ void SaveBossToJSON(const Circle& player) {
         j["weaponDamage"] = player.weaponDamage;
         j["baseSpeed"] = player.baseSpeed;
         j["weaponType"] = (int)player.weapon.type;
-        j["weaponOffsetX"] = player.weapon.offsetX;
-        j["weaponOffsetY"] = player.weapon.offsetY;
         j["weaponLength"] = player.weapon.length;
-        j["weaponColor"] = player.weapon.color;
         
         std::ofstream file(BOSS_SAVE_FILE);
         if (file.is_open()) {
@@ -231,10 +228,7 @@ bool LoadBossFromJSON(Circle& boss) {
         }
         boss.weapon.type = (WeaponType)weaponTypeInt;
         
-        boss.weapon.offsetX = j.value("weaponOffsetX", 45.0f);
-        boss.weapon.offsetY = j.value("weaponOffsetY", 0.0f);
         boss.weapon.length = j.value("weaponLength", 30.0f);
-        boss.weapon.color = j.value("weaponColor", COLOR_CYAN);
         
         return true;
     } catch (...) {
@@ -702,29 +696,29 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
             // Default boss (if load failed or no file)
             enemy.hp = enemy.maxHP;
             enemy.weapon.type = WEAPON_SPEAR;
-            enemy.weapon.offsetX = 45.0f;
-            enemy.weapon.offsetY = 0.0f;
             enemy.weapon.length = 30.0f;
-            enemy.weapon.color = COLOR_CYAN;
         }
         // Always set these defaults for boss (not persisted in save)
         enemy.vx = -2.0f;
         enemy.vy = -3.5f;
         enemy.angularVel = -0.025f;
-        enemy.color = COLOR_CYAN;
+        enemy.color = COLOR_RED;
+        enemy.weapon.offsetX = 45.0f;
+        enemy.weapon.offsetY = 0.0f;
+        enemy.weapon.color = COLOR_RED;
     } else {
         // Regular/elite enemy (for now, same as default)
         enemy.vx = -2.0f;
         enemy.vy = -3.5f;
         enemy.angularVel = -0.025f;
-        enemy.color = COLOR_CYAN;
+        enemy.color = COLOR_RED;
         enemy.maxHP = 10;
         enemy.hp = enemy.maxHP;
         enemy.weapon.type = WEAPON_SPEAR;
         enemy.weapon.offsetX = 45.0f;
         enemy.weapon.offsetY = 0.0f;
         enemy.weapon.length = 30.0f;
-        enemy.weapon.color = COLOR_CYAN;
+        enemy.weapon.color = COLOR_RED;
     }
 }
 
@@ -779,13 +773,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     playerChar.angle = INITIAL_WEAPON_ANGLE;
     playerChar.angularVel = 0.03f;
     playerChar.number = 92;
-    playerChar.color = COLOR_YELLOW;
+    playerChar.color = COLOR_CYAN;
     playerChar.hp = MAX_HP;
     playerChar.weapon.type = WEAPON_SPEAR;
     playerChar.weapon.offsetX = 40.0f;
     playerChar.weapon.offsetY = 0.0f;
     playerChar.weapon.length = 25.0f;
-    playerChar.weapon.color = COLOR_YELLOW;
+    playerChar.weapon.color = COLOR_CYAN;
     playerChar.maxHP = MAX_HP;
     playerChar.weaponDamage = 0;
     playerChar.baseSpeed = 1.0f;
@@ -1135,7 +1129,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     DrawLineAA(endX, endY, headX2, headY2, COLOR_YELLOW, 3.0f);
                 }
                 
-                // Draw enemy aim arrow (cyan, fixed initial direction)
+                // Draw enemy aim arrow (red, fixed initial direction)
                 float enemyCenterX = circles[1].x;
                 float enemyCenterY = circles[1].y;
                 float enemyVx = circles[1].vx;
@@ -1149,7 +1143,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     float enemyEndY = enemyCenterY + enemyDirY * AIM_ARROW_LENGTH;
                     
                     // Draw arrow line
-                    DrawLineAA(enemyCenterX, enemyCenterY, enemyEndX, enemyEndY, COLOR_CYAN, 3.0f);
+                    DrawLineAA(enemyCenterX, enemyCenterY, enemyEndX, enemyEndY, COLOR_RED, 3.0f);
                     
                     // Draw arrowhead
                     float arrowHeadLen = 10.0f;
@@ -1159,8 +1153,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     float headX2 = enemyEndX - enemyDirX * arrowHeadLen * cosf(arrowHeadAngle) - enemyDirY * arrowHeadLen * sinf(arrowHeadAngle);
                     float headY2 = enemyEndY - enemyDirY * arrowHeadLen * cosf(arrowHeadAngle) + enemyDirX * arrowHeadLen * sinf(arrowHeadAngle);
                     
-                    DrawLineAA(enemyEndX, enemyEndY, headX1, headY1, COLOR_CYAN, 3.0f);
-                    DrawLineAA(enemyEndX, enemyEndY, headX2, headY2, COLOR_CYAN, 3.0f);
+                    DrawLineAA(enemyEndX, enemyEndY, headX1, headY1, COLOR_RED, 3.0f);
+                    DrawLineAA(enemyEndX, enemyEndY, headX2, headY2, COLOR_RED, 3.0f);
                 }
                 
                 // Draw aim phase instructions
