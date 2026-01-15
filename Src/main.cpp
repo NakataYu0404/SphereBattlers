@@ -678,13 +678,15 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     // Get current row for comparison
     int currentRow = nodes[currentNodeIndex].row;
     
-    // Build a set of traversed edges (for exclusion from gray rendering)
+    // Build a list of traversed edges (for exclusion from gray rendering)
     std::vector<std::pair<int, int>> traversedEdges;
-    int nodeIdx = currentNodeIndex;
-    while (nodeIdx != -1 && nodes[nodeIdx].parentNodeIndex != -1) {
-        int parentIdx = nodes[nodeIdx].parentNodeIndex;
-        traversedEdges.push_back({parentIdx, nodeIdx});
-        nodeIdx = parentIdx;
+    {
+        int nodeIdx = currentNodeIndex;
+        while (nodeIdx != -1 && nodes[nodeIdx].parentNodeIndex != -1) {
+            int parentIdx = nodes[nodeIdx].parentNodeIndex;
+            traversedEdges.push_back({parentIdx, nodeIdx});
+            nodeIdx = parentIdx;
+        }
     }
     
     // Draw gray arrows for all reachable edges in current row and future rows
@@ -719,7 +721,7 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     }
     
     // Draw blue arrows for passed route (from start to current node)
-    nodeIdx = currentNodeIndex;
+    int nodeIdx = currentNodeIndex;
     while (nodeIdx != -1 && nodes[nodeIdx].parentNodeIndex != -1) {
         int parentIdx = nodes[nodeIdx].parentNodeIndex;
         DrawArrow(nodes[parentIdx].x, nodes[parentIdx].y,
