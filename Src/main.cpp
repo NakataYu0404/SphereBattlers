@@ -87,9 +87,11 @@ const char* BOSS_SAVE_FILE = "boss_save.json";
 
 // Scene enum
 enum Scene {
+    SCENE_TITLE,
     SCENE_MAP,
     SCENE_BATTLE,
-    SCENE_REWARD
+    SCENE_REWARD,
+    SCENE_GAME_OVER
 };
 
 // Battle phase enum
@@ -721,6 +723,49 @@ void UpdateReachability(std::vector<MapNode>& mapNodes, int currentNodeIndex) {
     }
 }
 
+// Draw title screen
+void DrawTitleScreen() {
+    // Draw title
+    DrawFormatString(SCREEN_WIDTH / 2 - 100, 200, COLOR_BLACK, "SPHERE BATTLERS");
+    
+    // Draw start instruction
+    DrawFormatString(SCREEN_WIDTH / 2 - 120, 300, COLOR_BLACK, "Press Enter/Space to Start");
+    DrawFormatString(SCREEN_WIDTH / 2 - 80, 320, COLOR_BLACK, "or Click Anywhere");
+    
+    // Draw controls info
+    DrawFormatString(SCREEN_WIDTH / 2 - 80, 400, COLOR_BLACK, "ESC: Quit");
+}
+
+// Draw game over screen
+void DrawGameOverScreen(int selectedOption) {
+    // Draw game over text
+    DrawFormatString(SCREEN_WIDTH / 2 - 60, 200, COLOR_BLACK, "GAME OVER");
+    
+    // Draw options
+    const int OPTION_BOX_WIDTH = 200;
+    const int OPTION_BOX_HEIGHT = 60;
+    const int OPTION_SPACING = 30;
+    const int OPTION_START_Y = 300;
+    const int OPTION_X = (SCREEN_WIDTH - OPTION_BOX_WIDTH) / 2;
+    
+    // Retry option
+    int retryY = OPTION_START_Y;
+    unsigned int retryColor = (selectedOption == 0) ? COLOR_YELLOW : COLOR_WHITE;
+    DrawBox(OPTION_X, retryY, OPTION_X + OPTION_BOX_WIDTH, retryY + OPTION_BOX_HEIGHT, retryColor, TRUE);
+    DrawBox(OPTION_X, retryY, OPTION_X + OPTION_BOX_WIDTH, retryY + OPTION_BOX_HEIGHT, COLOR_BLACK, FALSE);
+    DrawFormatString(OPTION_X + 40, retryY + 20, COLOR_BLACK, "Retry (Restart Run)");
+    
+    // Return to title option
+    int titleY = OPTION_START_Y + OPTION_BOX_HEIGHT + OPTION_SPACING;
+    unsigned int titleColor = (selectedOption == 1) ? COLOR_YELLOW : COLOR_WHITE;
+    DrawBox(OPTION_X, titleY, OPTION_X + OPTION_BOX_WIDTH, titleY + OPTION_BOX_HEIGHT, titleColor, TRUE);
+    DrawBox(OPTION_X, titleY, OPTION_X + OPTION_BOX_WIDTH, titleY + OPTION_BOX_HEIGHT, COLOR_BLACK, FALSE);
+    DrawFormatString(OPTION_X + 45, titleY + 20, COLOR_BLACK, "Return to Title");
+    
+    // Draw instructions
+    DrawFormatString(SCREEN_WIDTH / 2 - 120, 500, COLOR_BLACK, "Mouse: Click | Keys: Up/Down + Enter/Space");
+}
+
 // Initialize battle characters
 void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar, 
                       NodeType nodeType, const std::vector<MapNode>& mapNodes, int currentNodeIndex) {
@@ -807,7 +852,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SetDrawScreen(DX_SCREEN_BACK);
     
     // Initialize scene state
-    Scene currentScene = SCENE_MAP;
+    Scene currentScene = SCENE_TITLE;
     
     // Generate map
     std::vector<MapNode> mapNodes = GenerateMap();
@@ -869,6 +914,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     bool prevEnterKeyState = false;
     bool prevSpaceKeyState = false;
     
+    // Game over screen state
+    int gameOverSelectedOption = 0;  // 0 = Retry, 1 = Return to Title
+    
     // Main loop
     while (ProcessMessage() == 0) {
         // Check for ESC key to exit
@@ -880,7 +928,119 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ClearDrawScreen();
         DrawBox(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BEIGE, TRUE);
         
-        if (currentScene == SCENE_MAP) {
+        if (currentScene == SCENE_TITLE) {
+            // ===== TITLE SCENE =====
+            
+            DrawTitleScreen();
+            
+            // Handle input to start game
+            bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
+            bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
+            
+            // Mouse click
+            int mouseState = GetMouseInput();
+            bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
+            prevMouseState = mouseState;
+            
+            if (enterPressed || spacePressed || mouseClicked) {
+                // Start game - transition to map
+                currentScene = SCENE_MAP;
+            }
+            
+        } else if (currentScene == SCENE_GAME_OVER) {
+            // ===== GAME OVER SCENE =====
+            
+            // Handle keyboard navigation (Up/Down)
+            if (keyPressDelay > 0) {
+                keyPressDelay--;
+            }
+            
+            if (keyPressDelay == 0) {
+                bool moveUp = CheckHitKey(KEY_INPUT_UP) || CheckHitKey(KEY_INPUT_W);
+                bool moveDown = CheckHitKey(KEY_INPUT_DOWN) || CheckHitKey(KEY_INPUT_S);
+                
+                if (moveUp) {
+                    gameOverSelectedOption = (gameOverSelectedOption - 1 + 2) % 2;
+                    keyPressDelay = KEY_PRESS_COOLDOWN;
+                } else if (moveDown) {
+                    gameOverSelectedOption = (gameOverSelectedOption + 1) % 2;
+                    keyPressDelay = KEY_PRESS_COOLDOWN;
+                }
+            }
+            
+            // Handle mouse hover
+            int mouseX, mouseY;
+            GetMousePoint(&mouseX, &mouseY);
+            
+            const int OPTION_BOX_WIDTH = 200;
+            const int OPTION_BOX_HEIGHT = 60;
+            const int OPTION_SPACING = 30;
+            const int OPTION_START_Y = 300;
+            const int OPTION_X = (SCREEN_WIDTH - OPTION_BOX_WIDTH) / 2;
+            
+            // Check hover for Retry option
+            int retryY = OPTION_START_Y;
+            if (mouseX >= OPTION_X && mouseX <= OPTION_X + OPTION_BOX_WIDTH &&
+                mouseY >= retryY && mouseY <= retryY + OPTION_BOX_HEIGHT) {
+                gameOverSelectedOption = 0;
+            }
+            
+            // Check hover for Return to Title option
+            int titleY = OPTION_START_Y + OPTION_BOX_HEIGHT + OPTION_SPACING;
+            if (mouseX >= OPTION_X && mouseX <= OPTION_X + OPTION_BOX_WIDTH &&
+                mouseY >= titleY && mouseY <= titleY + OPTION_BOX_HEIGHT) {
+                gameOverSelectedOption = 1;
+            }
+            
+            // Handle selection
+            bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
+            bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
+            int mouseState = GetMouseInput();
+            bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
+            prevMouseState = mouseState;
+            
+            if (enterPressed || spacePressed || mouseClicked) {
+                if (gameOverSelectedOption == 0) {
+                    // Retry - restart from beginning
+                    mapNodes = GenerateMap();
+                    currentNodeIndex = 0;
+                    highlightedNodeIndex = 0;
+                    mapNodes[0].visited = true;
+                    for (int connectedIdx : mapNodes[0].connectedNodes) {
+                        mapNodes[connectedIdx].reachable = true;
+                        mapNodes[connectedIdx].parentNodeIndex = 0;
+                    }
+                    
+                    // Reset player
+                    playerChar.hp = MAX_HP;
+                    playerChar.maxHP = MAX_HP;
+                    playerChar.weaponDamage = 0;
+                    playerChar.baseSpeed = 1.0f;
+                    playerChar.vx = 2.5f;
+                    playerChar.vy = -3.0f;
+                    playerChar.angularVel = 0.03f;
+                    
+                    // Set input cooldown and clear input state before returning to map
+                    ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
+                    currentScene = SCENE_MAP;
+                } else {
+                    // Return to title
+                    // Reset player for fresh start
+                    playerChar.hp = MAX_HP;
+                    playerChar.maxHP = MAX_HP;
+                    playerChar.weaponDamage = 0;
+                    playerChar.baseSpeed = 1.0f;
+                    playerChar.vx = 2.5f;
+                    playerChar.vy = -3.0f;
+                    playerChar.angularVel = 0.03f;
+                    
+                    currentScene = SCENE_TITLE;
+                }
+            }
+            
+            DrawGameOverScreen(gameOverSelectedOption);
+            
+        } else if (currentScene == SCENE_MAP) {
             // ===== MAP SCENE =====
             
             // Update input cooldown timer
@@ -1412,25 +1572,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             currentScene = SCENE_REWARD;
                         }
                     } else {
-                        // Player lost - restart from beginning
-                        mapNodes = GenerateMap();
-                        currentNodeIndex = 0;
-                        highlightedNodeIndex = 0;
-                        mapNodes[0].visited = true;
-                        for (int connectedIdx : mapNodes[0].connectedNodes) {
-                            mapNodes[connectedIdx].reachable = true;
-                            mapNodes[connectedIdx].parentNodeIndex = 0;  // Set parent to start node
-                        }
-                        
-                        // Reset player
-                        playerChar.hp = MAX_HP;
-                        playerChar.maxHP = MAX_HP;
-                        playerChar.weaponDamage = 0;
-                        playerChar.baseSpeed = 1.0f;
-                        
-                        // Set input cooldown and clear input state before returning to map
+                        // Player lost - go to game over screen
+                        gameOverSelectedOption = 0;  // Reset to default (Retry)
                         ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
-                        currentScene = SCENE_MAP;
+                        currentScene = SCENE_GAME_OVER;
                     }
                 }
             }
@@ -1488,7 +1633,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     DrawFormatString(SCREEN_WIDTH / 2 - 120, TITLE_Y_POSITION + 20, COLOR_BLACK, "Click or press Enter/Space to continue");
                 } else {
                     DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Defeat!");
-                    DrawFormatString(SCREEN_WIDTH / 2 - 80, TITLE_Y_POSITION + 20, COLOR_BLACK, "Press Enter/Space to retry");
+                    DrawFormatString(SCREEN_WIDTH / 2 - 120, TITLE_Y_POSITION + 20, COLOR_BLACK, "Press Enter/Space to continue");
                 }
             } else {
                 // Draw title text at top
