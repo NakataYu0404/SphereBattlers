@@ -657,12 +657,38 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     // Draw title
     DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - Select Path");
     
-    // Draw gray edges only for the current node's immediate connections
-    // This shows only the reachable paths from the current node
-    for (int connectedIdx : nodes[currentNodeIndex].connectedNodes) {
-        DrawLineAA(nodes[currentNodeIndex].x, nodes[currentNodeIndex].y, 
-                  nodes[connectedIdx].x, nodes[connectedIdx].y, 
-                  COLOR_GRAY, 2.0f);
+    // Build set of nodes on the taken path
+    std::vector<bool> onTakenPath(nodes.size(), false);
+    int pathNodeIdx = currentNodeIndex;
+    while (pathNodeIdx != -1) {
+        onTakenPath[pathNodeIdx] = true;
+        pathNodeIdx = nodes[pathNodeIdx].parentNodeIndex;
+    }
+    
+    // Get current node's row to determine what's "ahead"
+    int currentRow = nodes[currentNodeIndex].row;
+    
+    // Draw gray edges for nodes that should show their connections:
+    // Show edges from nodes that are:
+    // 1. At current row or ahead (row >= currentRow), AND
+    // 2. Either not visited, OR on the taken path (current node)
+    for (size_t i = 0; i < nodes.size(); i++) {
+        // Only show nodes at current row or ahead
+        if (nodes[i].row < currentRow) {
+            continue;  // Skip nodes in past rows
+        }
+        
+        // For nodes at current row: only show if on taken path (i.e., the current node)
+        if (nodes[i].row == currentRow && !onTakenPath[i]) {
+            continue;  // Skip sibling nodes at current row that we didn't choose
+        }
+        
+        // Draw edges from this node
+        for (int connectedIdx : nodes[i].connectedNodes) {
+            DrawLineAA(nodes[i].x, nodes[i].y, 
+                      nodes[connectedIdx].x, nodes[connectedIdx].y, 
+                      COLOR_GRAY, 2.0f);
+        }
     }
     
     // Draw blue arrows for passed route (from start to current node)
