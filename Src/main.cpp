@@ -657,12 +657,16 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     // Draw title
     DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - Select Path");
     
-    // Draw edges first (behind nodes) - basic gray edges
+    // Draw gray edges only for reachable paths from current node
+    // An edge should be shown if it connects a reachable (or current) node to another node
     for (size_t i = 0; i < nodes.size(); i++) {
-        for (int connectedIdx : nodes[i].connectedNodes) {
-            DrawLineAA(nodes[i].x, nodes[i].y, 
-                      nodes[connectedIdx].x, nodes[connectedIdx].y, 
-                      COLOR_GRAY, 2.0f);
+        // Only draw edges from reachable nodes (or current node)
+        if (nodes[i].reachable || (int)i == currentNodeIndex) {
+            for (int connectedIdx : nodes[i].connectedNodes) {
+                DrawLineAA(nodes[i].x, nodes[i].y, 
+                          nodes[connectedIdx].x, nodes[connectedIdx].y, 
+                          COLOR_GRAY, 2.0f);
+            }
         }
     }
     
