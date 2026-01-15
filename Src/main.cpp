@@ -38,6 +38,7 @@ const float WEAPON_COLLISION_THRESHOLD = 5.0f;  // Distance threshold for weapon
 const float WEAPON_BOUNCE_DAMPING = 0.8f;  // Damping factor for weapon bounce
 const float HIT_COOLDOWN_DURATION = 24.0f;  // ~0.4s at 60fps (frames) - cooldown between hits
 const float MAP_INPUT_COOLDOWN_DURATION = 10.0f;  // ~0.167s at 60fps (frames) - cooldown after battle return
+const float BASE_WEAPON_LENGTH = 30.0f;  // Base length for weapon rendering scaling
 
 // Math constants
 #ifndef M_PI
@@ -303,7 +304,7 @@ const char* GetNodeTypeName(NodeType type) {
 void DrawBoomerang(float x, float y, float angle, unsigned int color, float length) {
     // Boomerang as two connected arcs forming a V shape
     // Scale all dimensions based on the weapon length
-    float scale = length / 30.0f;  // Base length is 30.0f (typical weapon length)
+    float scale = length / BASE_WEAPON_LENGTH;
     
     float cos_a = cosf(angle);
     float sin_a = sinf(angle);
@@ -341,7 +342,7 @@ void DrawSpear(float x, float y, float angle, unsigned int color, float length) 
     DrawLineAA(sx, sy, ex, ey, color, 3.0f);
     
     // Spear head (triangle) - scale proportionally with length
-    float headScale = length / 30.0f;  // Base length is 30.0f
+    float headScale = length / BASE_WEAPON_LENGTH;
     float tipX = ex + cos_a * 10.0f * headScale;
     float tipY = ey + sin_a * 10.0f * headScale;
     float baseX1 = ex - sin_a * 4.0f * headScale;
