@@ -300,22 +300,24 @@ const char* GetNodeTypeName(NodeType type) {
 }
 
 // Function to draw a boomerang
-void DrawBoomerang(float x, float y, float angle, unsigned int color) {
+void DrawBoomerang(float x, float y, float angle, float length, unsigned int color) {
     // Boomerang as two connected arcs forming a V shape
+    // Scale arm length based on length parameter (base reference: 20.0f for length=30.0f)
     float cos_a = cosf(angle);
     float sin_a = sinf(angle);
+    float scale = length / 30.0f;  // Scale based on reference length
     
-    // First arm
-    float x1 = x + cos_a * 20.0f - sin_a * 5.0f;
-    float y1 = y + sin_a * 20.0f + cos_a * 5.0f;
-    float x2 = x + cos_a * 5.0f - sin_a * 2.0f;
-    float y2 = y + sin_a * 5.0f + cos_a * 2.0f;
+    // First arm (scaled)
+    float x1 = x + cos_a * 20.0f * scale - sin_a * 5.0f * scale;
+    float y1 = y + sin_a * 20.0f * scale + cos_a * 5.0f * scale;
+    float x2 = x + cos_a * 5.0f * scale - sin_a * 2.0f * scale;
+    float y2 = y + sin_a * 5.0f * scale + cos_a * 2.0f * scale;
     
-    // Second arm
-    float x3 = x + cos_a * 5.0f + sin_a * 2.0f;
-    float y3 = y + sin_a * 5.0f - cos_a * 2.0f;
-    float x4 = x + cos_a * 20.0f + sin_a * 5.0f;
-    float y4 = y + sin_a * 20.0f - cos_a * 5.0f;
+    // Second arm (scaled)
+    float x3 = x + cos_a * 5.0f * scale + sin_a * 2.0f * scale;
+    float y3 = y + sin_a * 5.0f * scale - cos_a * 2.0f * scale;
+    float x4 = x + cos_a * 20.0f * scale + sin_a * 5.0f * scale;
+    float y4 = y + sin_a * 20.0f * scale - cos_a * 5.0f * scale;
     
     // Draw lines for boomerang arms
     DrawLineAA(x, y, x1, y1, color, 3.0f);
@@ -325,19 +327,19 @@ void DrawBoomerang(float x, float y, float angle, unsigned int color) {
 }
 
 // Function to draw a spear
-void DrawSpear(float x, float y, float angle, unsigned int color) {
+void DrawSpear(float x, float y, float angle, float length, unsigned int color) {
     float cos_a = cosf(angle);
     float sin_a = sinf(angle);
     
-    // Spear shaft
-    float shaftLen = 30.0f;
+    // Spear shaft (scaled by length parameter)
+    float shaftLen = length;
     float sx = x - cos_a * shaftLen * 0.5f;
     float sy = y - sin_a * shaftLen * 0.5f;
     float ex = x + cos_a * shaftLen * 0.5f;
     float ey = y + sin_a * shaftLen * 0.5f;
     DrawLineAA(sx, sy, ex, ey, color, 3.0f);
     
-    // Spear head (triangle)
+    // Spear head (triangle) - extends from shaft end
     float tipX = ex + cos_a * 10.0f;
     float tipY = ey + sin_a * 10.0f;
     float baseX1 = ex - sin_a * 4.0f;
@@ -1477,9 +1479,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 
                 // Draw weapon using player's angle
                 if (circles[i].weapon.type == WEAPON_BOOMERANG) {
-                    DrawBoomerang(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.color);
+                    DrawBoomerang(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.length, circles[i].weapon.color);
                 } else {
-                    DrawSpear(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.color);
+                    DrawSpear(weaponWorldX, weaponWorldY, circles[i].angle, circles[i].weapon.length, circles[i].weapon.color);
                 }
             }
             
