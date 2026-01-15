@@ -70,11 +70,12 @@ const float MAP_LEFT = 100.0f;
 const float MAP_RIGHT = 500.0f;
 const float MAP_TOP = 100.0f;
 const float MAP_BOTTOM = 650.0f;
-const int NODE_PROB_NORMAL = 60;    // 60% normal nodes
-const int NODE_PROB_ELITE = 70;     // 10% elite nodes (60-70)
-const int NODE_PROB_EVENT = 80;     // 10% event nodes (70-80)
-const int NODE_PROB_SHOP = 90;      // 10% shop nodes (80-90)
-// Remaining 10% are rest nodes (90-100)
+const int NODE_PROB_NORMAL = 60;    // 60% normal nodes (unused after shop removal, now 70%)
+const int NODE_PROB_ELITE = 70;     // 10% elite nodes (60-70) (unused after shop removal)
+const int NODE_PROB_EVENT = 80;     // 10% event nodes (70-80) (unused after shop removal)
+const int NODE_PROB_REST = 90;      // 10% rest nodes (80-90) (unused after shop removal)
+const int NODE_PROB_SHOP = 90;      // 10% shop nodes (80-90) - UNUSED, shops removed
+// After shop removal: 70% normal, 10% elite, 10% event, 10% rest (hardcoded in GenerateMap)
 const unsigned int COLOR_RED = 0xFF0000;
 const unsigned int COLOR_GREEN = 0x00FF00;
 const unsigned int COLOR_BLUE = 0x0000FF;
@@ -479,7 +480,7 @@ std::vector<MapNode> GenerateMap() {
     rowNodes[0].push_back(nodeIndex++);
     nodes.push_back(startNode);
     
-    // Rows 1-5: Mixed nodes (normal, elite, event, shop, rest)
+    // Rows 1-5: Mixed nodes (normal 70%, elite 10%, event 10%, rest 10%)
     for (int row = 1; row < MAP_ROWS - 1; row++) {
         // Random nodes per row based on constants
         std::uniform_int_distribution<> nodeDist(MAP_MIN_NODES_PER_ROW, MAP_MAX_NODES_PER_ROW);
@@ -492,17 +493,15 @@ std::vector<MapNode> GenerateMap() {
             node.visited = false;
             node.reachable = false;
             
-            // Node type distribution using probability constants
+            // Node type distribution: 70% normal, 10% elite, 10% event, 10% rest
             std::uniform_int_distribution<> typeDist(0, 99);
             int typeRoll = typeDist(gen);
-            if (typeRoll < NODE_PROB_NORMAL) {
+            if (typeRoll < 70) {
                 node.type = NODE_NORMAL;
-            } else if (typeRoll < NODE_PROB_ELITE) {
+            } else if (typeRoll < 80) {
                 node.type = NODE_ELITE;
-            } else if (typeRoll < NODE_PROB_EVENT) {
+            } else if (typeRoll < 90) {
                 node.type = NODE_EVENT;
-            } else if (typeRoll < NODE_PROB_SHOP) {
-                node.type = NODE_SHOP;
             } else {
                 node.type = NODE_REST;
             }
@@ -706,8 +705,21 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
         enemy.weapon.offsetX = 45.0f;
         enemy.weapon.offsetY = 0.0f;
         enemy.weapon.color = COLOR_RED;
+    } else if (nodeType == NODE_ELITE) {
+        // Elite enemy
+        enemy.vx = -2.0f;
+        enemy.vy = -3.5f;
+        enemy.angularVel = -0.025f;
+        enemy.color = COLOR_RED;
+        enemy.maxHP = 30;
+        enemy.hp = enemy.maxHP;
+        enemy.weapon.type = WEAPON_SPEAR;
+        enemy.weapon.offsetX = 45.0f;
+        enemy.weapon.offsetY = 0.0f;
+        enemy.weapon.length = 30.0f;
+        enemy.weapon.color = COLOR_RED;
     } else {
-        // Regular/elite enemy (for now, same as default)
+        // Normal enemy
         enemy.vx = -2.0f;
         enemy.vy = -3.5f;
         enemy.angularVel = -0.025f;
@@ -911,8 +923,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             aimKeyboardDirX = 0.0f;
                             aimKeyboardDirY = 0.0f;
                             aimKeyboardActive = false;
+                        } else if (mapNodes[currentNodeIndex].type == NODE_REST) {
+                            // Rest node: heal 50% of maxHP (clamped to maxHP)
+                            int healAmount = playerChar.maxHP / 2;
+                            playerChar.hp = ClampHP(playerChar.hp + healAmount, playerChar.maxHP);
+                            keyPressDelay = KEY_PRESS_COOLDOWN * 2;
                         } else {
-                            // Other node types (event, shop, rest) - just return to map for now
+                            // Other node types (event) - just return to map for now
                             // In a full implementation, these would have their own scenes
                             keyPressDelay = KEY_PRESS_COOLDOWN * 2;
                         }
@@ -950,6 +967,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         aimKeyboardDirX = 0.0f;
                         aimKeyboardDirY = 0.0f;
                         aimKeyboardActive = false;
+                    } else if (mapNodes[currentNodeIndex].type == NODE_REST) {
+                        // Rest node: heal 50% of maxHP (clamped to maxHP)
+                        int healAmount = playerChar.maxHP / 2;
+                        playerChar.hp = ClampHP(playerChar.hp + healAmount, playerChar.maxHP);
                     }
                 }
             }
@@ -1096,7 +1117,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         float endY = playerCenterY + dirY * arrowLen;
                         
                         // Draw arrow line
-                        DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_YELLOW, 3.0f);
+                        DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_CYAN, 3.0f);
                         
                         // Draw arrowhead
                         float arrowHeadLen = 10.0f;
@@ -1106,8 +1127,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         float headX2 = endX - dirX * arrowHeadLen * cosf(arrowHeadAngle) - dirY * arrowHeadLen * sinf(arrowHeadAngle);
                         float headY2 = endY - dirY * arrowHeadLen * cosf(arrowHeadAngle) + dirX * arrowHeadLen * sinf(arrowHeadAngle);
                         
-                        DrawLineAA(endX, endY, headX1, headY1, COLOR_YELLOW, 3.0f);
-                        DrawLineAA(endX, endY, headX2, headY2, COLOR_YELLOW, 3.0f);
+                        DrawLineAA(endX, endY, headX1, headY1, COLOR_CYAN, 3.0f);
+                        DrawLineAA(endX, endY, headX2, headY2, COLOR_CYAN, 3.0f);
                     }
                 } else if (aimKeyboardActive) {
                     // Keyboard direction arrow
@@ -1115,7 +1136,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     float endY = playerCenterY + aimKeyboardDirY * AIM_ARROW_LENGTH;
                     
                     // Draw arrow line
-                    DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_YELLOW, 3.0f);
+                    DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_CYAN, 3.0f);
                     
                     // Draw arrowhead
                     float arrowHeadLen = 10.0f;
@@ -1125,11 +1146,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     float headX2 = endX - aimKeyboardDirX * arrowHeadLen * cosf(arrowHeadAngle) - aimKeyboardDirY * arrowHeadLen * sinf(arrowHeadAngle);
                     float headY2 = endY - aimKeyboardDirY * arrowHeadLen * cosf(arrowHeadAngle) + aimKeyboardDirX * arrowHeadLen * sinf(arrowHeadAngle);
                     
-                    DrawLineAA(endX, endY, headX1, headY1, COLOR_YELLOW, 3.0f);
-                    DrawLineAA(endX, endY, headX2, headY2, COLOR_YELLOW, 3.0f);
+                    DrawLineAA(endX, endY, headX1, headY1, COLOR_CYAN, 3.0f);
+                    DrawLineAA(endX, endY, headX2, headY2, COLOR_CYAN, 3.0f);
                 }
                 
-                // Draw enemy aim arrow (red)
+                // Draw enemy aim arrow (red, fixed initial direction)
                 float enemyCenterX = circles[1].x;
                 float enemyCenterY = circles[1].y;
                 float enemyVx = circles[1].vx;
@@ -1399,12 +1420,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             // Reward selection state (persistent across frames in this scene)
             static int selectedReward = 0;  // 0 = HP, 1 = Attack, 2 = Speed
             static bool rewardSceneInitialized = false;
+            static NodeType lastBattleNodeType = NODE_NORMAL;
             
             // Initialize reward scene on first entry
             if (!rewardSceneInitialized) {
                 selectedReward = 0;
+                lastBattleNodeType = mapNodes[currentNodeIndex].type;
                 rewardSceneInitialized = true;
             }
+            
+            // Calculate reward multiplier (3x for Elite nodes)
+            int rewardMultiplier = (lastBattleNodeType == NODE_ELITE) ? 3 : 1;
             
             // Update input cooldown timer
             if (mapInputCooldown > 0.0f) {
@@ -1457,17 +1483,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
             
             if ((enterPressed || spacePressed || mouseClicked) && mapInputCooldown <= 0.0f) {
-                // Apply selected reward
+                // Apply selected reward with multiplier
                 if (selectedReward == 0) {
-                    // Max HP +10 (no healing)
-                    playerChar.maxHP += 10;
+                    // Max HP +10 (no healing) * multiplier
+                    playerChar.maxHP += 10 * rewardMultiplier;
                 } else if (selectedReward == 1) {
-                    // Attack +1 (weapon damage +1)
-                    playerChar.weaponDamage += 1;
+                    // Attack +1 (weapon damage +1) * multiplier
+                    playerChar.weaponDamage += 1 * rewardMultiplier;
                 } else if (selectedReward == 2) {
-                    // Speed +0.1
+                    // Speed +0.1 * multiplier
                     float oldSpeed = playerChar.baseSpeed;
-                    playerChar.baseSpeed += 0.1f;
+                    playerChar.baseSpeed += 0.1f * rewardMultiplier;
                     // Apply proportionally to current velocity (avoid division by zero)
                     if (oldSpeed > 0.0f) {
                         float speedMult = playerChar.baseSpeed / oldSpeed;
@@ -1488,6 +1514,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             // Draw reward selection UI
             DrawFormatString(SCREEN_WIDTH / 2 - 80, 150, COLOR_BLACK, "Select Your Reward!");
+            if (rewardMultiplier > 1) {
+                DrawFormatString(SCREEN_WIDTH / 2 - 90, 180, COLOR_BLACK, "Elite Victory: %dx rewards!", rewardMultiplier);
+            }
             
             for (int i = 0; i < 3; i++) {
                 int boxX = REWARD_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
@@ -1500,15 +1529,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 
                 // Draw reward text
                 if (i == 0) {
-                    DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +10");
+                    DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +%d", 10 * rewardMultiplier);
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(No healing)");
                     DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", playerChar.maxHP);
                 } else if (i == 1) {
-                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +1");
+                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +%d", 1 * rewardMultiplier);
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Weapon dmg)");
                     DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", GetTotalWeaponDamage(playerChar));
                 } else if (i == 2) {
-                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Speed +0.1");
+                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Speed +%.1f", 0.1f * rewardMultiplier);
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Movement)");
                     DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %.1f", playerChar.baseSpeed);
                 }
