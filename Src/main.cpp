@@ -822,14 +822,29 @@ void UpdateReachability(std::vector<MapNode>& mapNodes, int currentNodeIndex) {
 
 // Helper function to reset player character to initial state
 void ResetPlayerCharacter(Circle& playerChar) {
+    // Reset position
+    playerChar.x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
+    playerChar.y = FRAME_BOTTOM - 80.0f;
+    
+    // Reset velocity and rotation
+    playerChar.vx = PLAYER_INITIAL_VX;
+    playerChar.vy = PLAYER_INITIAL_VY;
+    playerChar.angle = INITIAL_WEAPON_ANGLE;
+    playerChar.angularVel = PLAYER_INITIAL_ANGULAR_VEL;
+    
+    // Reset HP and stats
     playerChar.hp = MAX_HP;
     playerChar.maxHP = MAX_HP;
     playerChar.weaponDamage = 0;
     playerChar.baseSpeed = 1.0f;
-    playerChar.vx = PLAYER_INITIAL_VX;
-    playerChar.vy = PLAYER_INITIAL_VY;
-    playerChar.angularVel = PLAYER_INITIAL_ANGULAR_VEL;
     playerChar.critRate = 0.0f;
+    
+    // Reset weapon to initial defaults
+    playerChar.weapon.type = WEAPON_SPEAR;
+    playerChar.weapon.offsetX = 40.0f;
+    playerChar.weapon.offsetY = 0.0f;
+    playerChar.weapon.length = 25.0f;
+    playerChar.weapon.color = COLOR_CYAN;
 }
 
 // Character set mode enum
@@ -1150,7 +1165,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
                     currentScene = SCENE_MAP;
                 } else {
-                    // Return to title
+                    // Return to title - reset for fresh start
+                    mapNodes = GenerateMap();
+                    currentNodeIndex = 0;
+                    highlightedNodeIndex = 0;
+                    mapNodes[0].visited = true;
+                    for (int connectedIdx : mapNodes[0].connectedNodes) {
+                        mapNodes[connectedIdx].reachable = true;
+                        mapNodes[connectedIdx].parentNodeIndex = 0;
+                    }
+                    
                     ResetPlayerCharacter(playerChar);
                     currentScene = SCENE_TITLE;
                 }
@@ -1835,12 +1859,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         mapNodes[connectedIdx].parentNodeIndex = 0;
                     }
                     
-                    // Reset player
-                    playerChar.hp = MAX_HP;
-                    playerChar.maxHP = MAX_HP;
-                    playerChar.weaponDamage = 0;
-                    playerChar.baseSpeed = 1.0f;
-                    playerChar.critRate = 0.0f;
+                    // Reset player fully (all stats, position, velocity, weapon)
+                    ResetPlayerCharacter(playerChar);
                     
                     // Reset name entry state for next time
                     nameEntryInitialized = false;
