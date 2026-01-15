@@ -190,10 +190,7 @@ void SaveBossToJSON(const Circle& player) {
         j["weaponDamage"] = player.weaponDamage;
         j["baseSpeed"] = player.baseSpeed;
         j["weaponType"] = (int)player.weapon.type;
-        j["weaponOffsetX"] = player.weapon.offsetX;
-        j["weaponOffsetY"] = player.weapon.offsetY;
         j["weaponLength"] = player.weapon.length;
-        j["weaponColor"] = player.weapon.color;
         
         std::ofstream file(BOSS_SAVE_FILE);
         if (file.is_open()) {
@@ -231,10 +228,7 @@ bool LoadBossFromJSON(Circle& boss) {
         }
         boss.weapon.type = (WeaponType)weaponTypeInt;
         
-        boss.weapon.offsetX = j.value("weaponOffsetX", 45.0f);
-        boss.weapon.offsetY = j.value("weaponOffsetY", 0.0f);
         boss.weapon.length = j.value("weaponLength", 30.0f);
-        boss.weapon.color = j.value("weaponColor", COLOR_CYAN);
         
         return true;
     } catch (...) {
@@ -485,7 +479,7 @@ std::vector<MapNode> GenerateMap() {
     rowNodes[0].push_back(nodeIndex++);
     nodes.push_back(startNode);
     
-    // Rows 1-5: Mixed nodes (normal, elite, event, shop, rest)
+    // Rows 1-5: Mixed nodes (normal, elite, event, rest)
     for (int row = 1; row < MAP_ROWS - 1; row++) {
         // Random nodes per row based on constants
         std::uniform_int_distribution<> nodeDist(MAP_MIN_NODES_PER_ROW, MAP_MAX_NODES_PER_ROW);
@@ -498,7 +492,7 @@ std::vector<MapNode> GenerateMap() {
             node.visited = false;
             node.reachable = false;
             
-            // Node type distribution using probability constants
+            // Node type distribution (no shops)
             std::uniform_int_distribution<> typeDist(0, 99);
             int typeRoll = typeDist(gen);
             if (typeRoll < NODE_PROB_NORMAL) {
@@ -507,8 +501,6 @@ std::vector<MapNode> GenerateMap() {
                 node.type = NODE_ELITE;
             } else if (typeRoll < NODE_PROB_EVENT) {
                 node.type = NODE_EVENT;
-            } else if (typeRoll < NODE_PROB_SHOP) {
-                node.type = NODE_SHOP;
             } else {
                 node.type = NODE_REST;
             }
@@ -702,29 +694,42 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
             // Default boss (if load failed or no file)
             enemy.hp = enemy.maxHP;
             enemy.weapon.type = WEAPON_SPEAR;
-            enemy.weapon.offsetX = 45.0f;
-            enemy.weapon.offsetY = 0.0f;
             enemy.weapon.length = 30.0f;
-            enemy.weapon.color = COLOR_CYAN;
         }
         // Always set these defaults for boss (not persisted in save)
         enemy.vx = -2.0f;
         enemy.vy = -3.5f;
         enemy.angularVel = -0.025f;
-        enemy.color = COLOR_CYAN;
-    } else {
-        // Regular/elite enemy (for now, same as default)
+        enemy.color = COLOR_RED;
+        enemy.weapon.offsetX = 45.0f;
+        enemy.weapon.offsetY = 0.0f;
+        enemy.weapon.color = COLOR_RED;
+    } else if (nodeType == NODE_ELITE) {
+        // Elite enemy
         enemy.vx = -2.0f;
         enemy.vy = -3.5f;
         enemy.angularVel = -0.025f;
-        enemy.color = COLOR_CYAN;
+        enemy.color = COLOR_RED;
+        enemy.maxHP = 30;
+        enemy.hp = enemy.maxHP;
+        enemy.weapon.type = WEAPON_SPEAR;
+        enemy.weapon.offsetX = 45.0f;
+        enemy.weapon.offsetY = 0.0f;
+        enemy.weapon.length = 30.0f;
+        enemy.weapon.color = COLOR_RED;
+    } else {
+        // Normal enemy
+        enemy.vx = -2.0f;
+        enemy.vy = -3.5f;
+        enemy.angularVel = -0.025f;
+        enemy.color = COLOR_RED;
         enemy.maxHP = 10;
         enemy.hp = enemy.maxHP;
         enemy.weapon.type = WEAPON_SPEAR;
         enemy.weapon.offsetX = 45.0f;
         enemy.weapon.offsetY = 0.0f;
         enemy.weapon.length = 30.0f;
-        enemy.weapon.color = COLOR_CYAN;
+        enemy.weapon.color = COLOR_RED;
     }
 }
 
@@ -779,13 +784,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     playerChar.angle = INITIAL_WEAPON_ANGLE;
     playerChar.angularVel = 0.03f;
     playerChar.number = 92;
-    playerChar.color = COLOR_YELLOW;
+    playerChar.color = COLOR_CYAN;
     playerChar.hp = MAX_HP;
     playerChar.weapon.type = WEAPON_SPEAR;
     playerChar.weapon.offsetX = 40.0f;
     playerChar.weapon.offsetY = 0.0f;
     playerChar.weapon.length = 25.0f;
-    playerChar.weapon.color = COLOR_YELLOW;
+    playerChar.weapon.color = COLOR_CYAN;
     playerChar.maxHP = MAX_HP;
     playerChar.weaponDamage = 0;
     playerChar.baseSpeed = 1.0f;
@@ -917,8 +922,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             aimKeyboardDirX = 0.0f;
                             aimKeyboardDirY = 0.0f;
                             aimKeyboardActive = false;
+                        } else if (mapNodes[currentNodeIndex].type == NODE_REST) {
+                            // Rest node: heal 50% of maxHP (clamped to maxHP)
+                            int healAmount = playerChar.maxHP / 2;
+                            playerChar.hp = ClampHP(playerChar.hp + healAmount, playerChar.maxHP);
+                            keyPressDelay = KEY_PRESS_COOLDOWN * 2;
                         } else {
-                            // Other node types (event, shop, rest) - just return to map for now
+                            // Other node types (event) - just return to map for now
                             // In a full implementation, these would have their own scenes
                             keyPressDelay = KEY_PRESS_COOLDOWN * 2;
                         }
@@ -956,6 +966,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         aimKeyboardDirX = 0.0f;
                         aimKeyboardDirY = 0.0f;
                         aimKeyboardActive = false;
+                    } else if (mapNodes[currentNodeIndex].type == NODE_REST) {
+                        // Rest node: heal 50% of maxHP (clamped to maxHP)
+                        int healAmount = playerChar.maxHP / 2;
+                        playerChar.hp = ClampHP(playerChar.hp + healAmount, playerChar.maxHP);
                     }
                 }
             }
@@ -1405,12 +1419,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             // Reward selection state (persistent across frames in this scene)
             static int selectedReward = 0;  // 0 = HP, 1 = Attack, 2 = Speed
             static bool rewardSceneInitialized = false;
+            static NodeType lastBattleNodeType = NODE_NORMAL;
             
             // Initialize reward scene on first entry
             if (!rewardSceneInitialized) {
                 selectedReward = 0;
+                lastBattleNodeType = mapNodes[currentNodeIndex].type;
                 rewardSceneInitialized = true;
             }
+            
+            // Calculate reward multiplier (3x for Elite nodes)
+            int rewardMultiplier = (lastBattleNodeType == NODE_ELITE) ? 3 : 1;
             
             // Update input cooldown timer
             if (mapInputCooldown > 0.0f) {
@@ -1463,17 +1482,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
             
             if ((enterPressed || spacePressed || mouseClicked) && mapInputCooldown <= 0.0f) {
-                // Apply selected reward
+                // Apply selected reward with multiplier
                 if (selectedReward == 0) {
-                    // Max HP +10 (no healing)
-                    playerChar.maxHP += 10;
+                    // Max HP +10 (no healing) * multiplier
+                    playerChar.maxHP += 10 * rewardMultiplier;
                 } else if (selectedReward == 1) {
-                    // Attack +1 (weapon damage +1)
-                    playerChar.weaponDamage += 1;
+                    // Attack +1 (weapon damage +1) * multiplier
+                    playerChar.weaponDamage += 1 * rewardMultiplier;
                 } else if (selectedReward == 2) {
-                    // Speed +0.1
+                    // Speed +0.1 * multiplier
                     float oldSpeed = playerChar.baseSpeed;
-                    playerChar.baseSpeed += 0.1f;
+                    playerChar.baseSpeed += 0.1f * rewardMultiplier;
                     // Apply proportionally to current velocity (avoid division by zero)
                     if (oldSpeed > 0.0f) {
                         float speedMult = playerChar.baseSpeed / oldSpeed;
@@ -1494,6 +1513,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             // Draw reward selection UI
             DrawFormatString(SCREEN_WIDTH / 2 - 80, 150, COLOR_BLACK, "Select Your Reward!");
+            if (rewardMultiplier > 1) {
+                DrawFormatString(SCREEN_WIDTH / 2 - 90, 180, COLOR_BLACK, "Elite Victory: %dx rewards!", rewardMultiplier);
+            }
             
             for (int i = 0; i < 3; i++) {
                 int boxX = REWARD_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
@@ -1506,15 +1528,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 
                 // Draw reward text
                 if (i == 0) {
-                    DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +10");
+                    DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +%d", 10 * rewardMultiplier);
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(No healing)");
                     DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", playerChar.maxHP);
                 } else if (i == 1) {
-                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +1");
+                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +%d", 1 * rewardMultiplier);
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Weapon dmg)");
                     DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", GetTotalWeaponDamage(playerChar));
                 } else if (i == 2) {
-                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Speed +0.1");
+                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Speed +%.1f", 0.1f * rewardMultiplier);
                     DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Movement)");
                     DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %.1f", playerChar.baseSpeed);
                 }
