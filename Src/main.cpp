@@ -85,11 +85,17 @@ const unsigned int COLOR_GRAY = 0x808080;
 const unsigned int COLOR_WHITE = 0xFFFFFF;
 const char* BOSS_SAVE_FILE = "boss_save.json";
 
+// Player initial state constants
+const float PLAYER_INITIAL_VX = 2.5f;
+const float PLAYER_INITIAL_VY = -3.0f;
+const float PLAYER_INITIAL_ANGULAR_VEL = 0.03f;
+
 // Game over screen layout constants
 const int GAME_OVER_OPTION_BOX_WIDTH = 200;
 const int GAME_OVER_OPTION_BOX_HEIGHT = 60;
 const int GAME_OVER_OPTION_SPACING = 30;
 const int GAME_OVER_OPTION_START_Y = 300;
+const int GAME_OVER_NUM_OPTIONS = 2;
 
 // Scene enum
 enum Scene {
@@ -735,9 +741,9 @@ void ResetPlayerCharacter(Circle& playerChar) {
     playerChar.maxHP = MAX_HP;
     playerChar.weaponDamage = 0;
     playerChar.baseSpeed = 1.0f;
-    playerChar.vx = 2.5f;
-    playerChar.vy = -3.0f;
-    playerChar.angularVel = 0.03f;
+    playerChar.vx = PLAYER_INITIAL_VX;
+    playerChar.vy = PLAYER_INITIAL_VY;
+    playerChar.angularVel = PLAYER_INITIAL_ANGULAR_VEL;
 }
 
 // Draw title screen
@@ -897,10 +903,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     Circle playerChar;
     playerChar.x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
     playerChar.y = FRAME_BOTTOM - 80.0f;
-    playerChar.vx = 2.5f;
-    playerChar.vy = -3.0f;
+    playerChar.vx = PLAYER_INITIAL_VX;
+    playerChar.vy = PLAYER_INITIAL_VY;
     playerChar.angle = INITIAL_WEAPON_ANGLE;
-    playerChar.angularVel = 0.03f;
+    playerChar.angularVel = PLAYER_INITIAL_ANGULAR_VEL;
     playerChar.number = 92;
     playerChar.color = COLOR_CYAN;
     playerChar.hp = MAX_HP;
@@ -973,10 +979,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 bool moveDown = CheckHitKey(KEY_INPUT_DOWN) || CheckHitKey(KEY_INPUT_S);
                 
                 if (moveUp) {
-                    gameOverSelectedOption = (gameOverSelectedOption - 1 + 2) % 2;
+                    gameOverSelectedOption = (gameOverSelectedOption - 1 + GAME_OVER_NUM_OPTIONS) % GAME_OVER_NUM_OPTIONS;
                     keyPressDelay = KEY_PRESS_COOLDOWN;
                 } else if (moveDown) {
-                    gameOverSelectedOption = (gameOverSelectedOption + 1) % 2;
+                    gameOverSelectedOption = (gameOverSelectedOption + 1) % GAME_OVER_NUM_OPTIONS;
                     keyPressDelay = KEY_PRESS_COOLDOWN;
                 }
             }
