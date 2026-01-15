@@ -866,26 +866,25 @@ std::vector<std::string> GetCharacterSet(CharSetMode mode) {
             chars.push_back(katakana[i]);
         }
     } else if (mode == CHARSET_ENGLISH) {
-        // English alphabet and numbers
+        // English alphabet (uppercase + lowercase) and numbers
         const char* english[] = {
             "A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
             "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
-            "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d",
-            "e", "f", "g", "h", "i", "j", "k", "l", "m", "n",
-            "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
-            "y", "z", "0", "1", "2", "3", "4", "5", "6", "7"
+            "U", "V", "W", "X", "Y", "Z", "0", "1", "2", "3",
+            "4", "5", "6", "7", "8", "9", " ", "a", "b", "c",
+            "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"
         };
         for (int i = 0; i < 50; i++) {
             chars.push_back(english[i]);
         }
     } else if (mode == CHARSET_SYMBOLS) {
-        // Symbols and numbers
+        // Lowercase letters and symbols
         const char* symbols[] = {
-            "8", "9", "0", "1", "2", "3", "4", "5", "6", "7",
-            "!", "?", ".", ",", "-", "_", "+", "=", "*", "/",
-            "@", "#", "$", "%", "&", "(", ")", "[", "]", "{",
-            "}", "<", ">", ":", ";", "\"", "'", "`", "~", "^",
-            "|", "\\", " ", "。", "、", "！", "？", "～", "・", "…"
+            "n", "o", "p", "q", "r", "s", "t", "u", "v", "w",
+            "x", "y", "z", "!", "?", ".", ",", "-", "_", "+",
+            "=", "*", "/", "@", "#", "$", "%", "&", "(", ")",
+            "[", "]", "{", "}", "<", ">", ":", ";", "\"", "'",
+            "`", "~", "^", "|", "\\", "。", "、", "！", "？", "～"
         };
         for (int i = 0; i < 50; i++) {
             chars.push_back(symbols[i]);
