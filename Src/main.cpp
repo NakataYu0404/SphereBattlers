@@ -675,8 +675,51 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     // Draw title
     DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - Select Path");
     
-    // Draw blue arrows for passed route (from start to current node)
+    // Get current row for comparison
+    int currentRow = nodes[currentNodeIndex].row;
+    
+    // Build a set of traversed edges (for exclusion from gray rendering)
+    std::vector<std::pair<int, int>> traversedEdges;
     int nodeIdx = currentNodeIndex;
+    while (nodeIdx != -1 && nodes[nodeIdx].parentNodeIndex != -1) {
+        int parentIdx = nodes[nodeIdx].parentNodeIndex;
+        traversedEdges.push_back({parentIdx, nodeIdx});
+        nodeIdx = parentIdx;
+    }
+    
+    // Draw gray arrows for all reachable edges in current row and future rows
+    // (rows >= currentRow)
+    for (size_t i = 0; i < nodes.size(); i++) {
+        // Only process nodes in current row or future rows (rows >= currentRow)
+        if (nodes[i].row < currentRow) continue;
+        
+        // Draw edges from this node to connected nodes
+        for (int connectedIdx : nodes[i].connectedNodes) {
+            // Check if this edge is part of traversed path (skip if it is, will draw in blue)
+            bool isTraversed = false;
+            for (const auto& edge : traversedEdges) {
+                if (edge.first == (int)i && edge.second == connectedIdx) {
+                    isTraversed = true;
+                    break;
+                }
+            }
+            
+            // Check if this edge is the highlighted edge (skip if it is, will draw in red)
+            bool isHighlighted = ((int)i == currentNodeIndex && connectedIdx == highlightedNodeIndex &&
+                                 highlightedNodeIndex >= 0 && nodes[highlightedNodeIndex].reachable && 
+                                 !nodes[highlightedNodeIndex].visited);
+            
+            // Draw gray arrow only if not traversed and not highlighted
+            if (!isTraversed && !isHighlighted) {
+                DrawArrow(nodes[i].x, nodes[i].y,
+                         nodes[connectedIdx].x, nodes[connectedIdx].y,
+                         COLOR_GRAY, 2.0f);
+            }
+        }
+    }
+    
+    // Draw blue arrows for passed route (from start to current node)
+    nodeIdx = currentNodeIndex;
     while (nodeIdx != -1 && nodes[nodeIdx].parentNodeIndex != -1) {
         int parentIdx = nodes[nodeIdx].parentNodeIndex;
         DrawArrow(nodes[parentIdx].x, nodes[parentIdx].y,
