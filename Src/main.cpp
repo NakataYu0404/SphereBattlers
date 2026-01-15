@@ -85,6 +85,12 @@ const unsigned int COLOR_GRAY = 0x808080;
 const unsigned int COLOR_WHITE = 0xFFFFFF;
 const char* BOSS_SAVE_FILE = "boss_save.json";
 
+// Game over screen layout constants
+const int GAME_OVER_OPTION_BOX_WIDTH = 200;
+const int GAME_OVER_OPTION_BOX_HEIGHT = 60;
+const int GAME_OVER_OPTION_SPACING = 30;
+const int GAME_OVER_OPTION_START_Y = 300;
+
 // Scene enum
 enum Scene {
     SCENE_TITLE,
@@ -723,6 +729,17 @@ void UpdateReachability(std::vector<MapNode>& mapNodes, int currentNodeIndex) {
     }
 }
 
+// Helper function to reset player character to initial state
+void ResetPlayerCharacter(Circle& playerChar) {
+    playerChar.hp = MAX_HP;
+    playerChar.maxHP = MAX_HP;
+    playerChar.weaponDamage = 0;
+    playerChar.baseSpeed = 1.0f;
+    playerChar.vx = 2.5f;
+    playerChar.vy = -3.0f;
+    playerChar.angularVel = 0.03f;
+}
+
 // Draw title screen
 void DrawTitleScreen() {
     // Draw title
@@ -741,25 +758,21 @@ void DrawGameOverScreen(int selectedOption) {
     // Draw game over text
     DrawFormatString(SCREEN_WIDTH / 2 - 60, 200, COLOR_BLACK, "GAME OVER");
     
-    // Draw options
-    const int OPTION_BOX_WIDTH = 200;
-    const int OPTION_BOX_HEIGHT = 60;
-    const int OPTION_SPACING = 30;
-    const int OPTION_START_Y = 300;
-    const int OPTION_X = (SCREEN_WIDTH - OPTION_BOX_WIDTH) / 2;
+    // Calculate option positions
+    const int OPTION_X = (SCREEN_WIDTH - GAME_OVER_OPTION_BOX_WIDTH) / 2;
     
     // Retry option
-    int retryY = OPTION_START_Y;
+    int retryY = GAME_OVER_OPTION_START_Y;
     unsigned int retryColor = (selectedOption == 0) ? COLOR_YELLOW : COLOR_WHITE;
-    DrawBox(OPTION_X, retryY, OPTION_X + OPTION_BOX_WIDTH, retryY + OPTION_BOX_HEIGHT, retryColor, TRUE);
-    DrawBox(OPTION_X, retryY, OPTION_X + OPTION_BOX_WIDTH, retryY + OPTION_BOX_HEIGHT, COLOR_BLACK, FALSE);
+    DrawBox(OPTION_X, retryY, OPTION_X + GAME_OVER_OPTION_BOX_WIDTH, retryY + GAME_OVER_OPTION_BOX_HEIGHT, retryColor, TRUE);
+    DrawBox(OPTION_X, retryY, OPTION_X + GAME_OVER_OPTION_BOX_WIDTH, retryY + GAME_OVER_OPTION_BOX_HEIGHT, COLOR_BLACK, FALSE);
     DrawFormatString(OPTION_X + 40, retryY + 20, COLOR_BLACK, "Retry (Restart Run)");
     
     // Return to title option
-    int titleY = OPTION_START_Y + OPTION_BOX_HEIGHT + OPTION_SPACING;
+    int titleY = GAME_OVER_OPTION_START_Y + GAME_OVER_OPTION_BOX_HEIGHT + GAME_OVER_OPTION_SPACING;
     unsigned int titleColor = (selectedOption == 1) ? COLOR_YELLOW : COLOR_WHITE;
-    DrawBox(OPTION_X, titleY, OPTION_X + OPTION_BOX_WIDTH, titleY + OPTION_BOX_HEIGHT, titleColor, TRUE);
-    DrawBox(OPTION_X, titleY, OPTION_X + OPTION_BOX_WIDTH, titleY + OPTION_BOX_HEIGHT, COLOR_BLACK, FALSE);
+    DrawBox(OPTION_X, titleY, OPTION_X + GAME_OVER_OPTION_BOX_WIDTH, titleY + GAME_OVER_OPTION_BOX_HEIGHT, titleColor, TRUE);
+    DrawBox(OPTION_X, titleY, OPTION_X + GAME_OVER_OPTION_BOX_WIDTH, titleY + GAME_OVER_OPTION_BOX_HEIGHT, COLOR_BLACK, FALSE);
     DrawFormatString(OPTION_X + 45, titleY + 20, COLOR_BLACK, "Return to Title");
     
     // Draw instructions
@@ -972,23 +985,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             int mouseX, mouseY;
             GetMousePoint(&mouseX, &mouseY);
             
-            const int OPTION_BOX_WIDTH = 200;
-            const int OPTION_BOX_HEIGHT = 60;
-            const int OPTION_SPACING = 30;
-            const int OPTION_START_Y = 300;
-            const int OPTION_X = (SCREEN_WIDTH - OPTION_BOX_WIDTH) / 2;
+            const int OPTION_X = (SCREEN_WIDTH - GAME_OVER_OPTION_BOX_WIDTH) / 2;
             
             // Check hover for Retry option
-            int retryY = OPTION_START_Y;
-            if (mouseX >= OPTION_X && mouseX <= OPTION_X + OPTION_BOX_WIDTH &&
-                mouseY >= retryY && mouseY <= retryY + OPTION_BOX_HEIGHT) {
+            int retryY = GAME_OVER_OPTION_START_Y;
+            if (mouseX >= OPTION_X && mouseX <= OPTION_X + GAME_OVER_OPTION_BOX_WIDTH &&
+                mouseY >= retryY && mouseY <= retryY + GAME_OVER_OPTION_BOX_HEIGHT) {
                 gameOverSelectedOption = 0;
             }
             
             // Check hover for Return to Title option
-            int titleY = OPTION_START_Y + OPTION_BOX_HEIGHT + OPTION_SPACING;
-            if (mouseX >= OPTION_X && mouseX <= OPTION_X + OPTION_BOX_WIDTH &&
-                mouseY >= titleY && mouseY <= titleY + OPTION_BOX_HEIGHT) {
+            int titleY = GAME_OVER_OPTION_START_Y + GAME_OVER_OPTION_BOX_HEIGHT + GAME_OVER_OPTION_SPACING;
+            if (mouseX >= OPTION_X && mouseX <= OPTION_X + GAME_OVER_OPTION_BOX_WIDTH &&
+                mouseY >= titleY && mouseY <= titleY + GAME_OVER_OPTION_BOX_HEIGHT) {
                 gameOverSelectedOption = 1;
             }
             
@@ -1012,28 +1021,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     }
                     
                     // Reset player
-                    playerChar.hp = MAX_HP;
-                    playerChar.maxHP = MAX_HP;
-                    playerChar.weaponDamage = 0;
-                    playerChar.baseSpeed = 1.0f;
-                    playerChar.vx = 2.5f;
-                    playerChar.vy = -3.0f;
-                    playerChar.angularVel = 0.03f;
+                    ResetPlayerCharacter(playerChar);
                     
                     // Set input cooldown and clear input state before returning to map
                     ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
                     currentScene = SCENE_MAP;
                 } else {
                     // Return to title
-                    // Reset player for fresh start
-                    playerChar.hp = MAX_HP;
-                    playerChar.maxHP = MAX_HP;
-                    playerChar.weaponDamage = 0;
-                    playerChar.baseSpeed = 1.0f;
-                    playerChar.vx = 2.5f;
-                    playerChar.vy = -3.0f;
-                    playerChar.angularVel = 0.03f;
-                    
+                    ResetPlayerCharacter(playerChar);
                     currentScene = SCENE_TITLE;
                 }
             }
