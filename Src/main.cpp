@@ -70,11 +70,12 @@ const float MAP_LEFT = 100.0f;
 const float MAP_RIGHT = 500.0f;
 const float MAP_TOP = 100.0f;
 const float MAP_BOTTOM = 650.0f;
-const int NODE_PROB_NORMAL = 60;    // 60% normal nodes
-const int NODE_PROB_ELITE = 70;     // 10% elite nodes (60-70)
-const int NODE_PROB_EVENT = 80;     // 10% event nodes (70-80)
-const int NODE_PROB_SHOP = 90;      // 10% shop nodes (80-90)
-// Remaining 10% are rest nodes (90-100)
+const int NODE_PROB_NORMAL = 60;    // 60% normal nodes (unused after shop removal, now 70%)
+const int NODE_PROB_ELITE = 70;     // 10% elite nodes (60-70) (unused after shop removal)
+const int NODE_PROB_EVENT = 80;     // 10% event nodes (70-80) (unused after shop removal)
+const int NODE_PROB_REST = 90;      // 10% rest nodes (80-90) (unused after shop removal)
+const int NODE_PROB_SHOP = 90;      // 10% shop nodes (80-90) - UNUSED, shops removed
+// After shop removal: 70% normal, 10% elite, 10% event, 10% rest (hardcoded in GenerateMap)
 const unsigned int COLOR_RED = 0xFF0000;
 const unsigned int COLOR_GREEN = 0x00FF00;
 const unsigned int COLOR_BLUE = 0x0000FF;
@@ -479,7 +480,7 @@ std::vector<MapNode> GenerateMap() {
     rowNodes[0].push_back(nodeIndex++);
     nodes.push_back(startNode);
     
-    // Rows 1-5: Mixed nodes (normal, elite, event, rest)
+    // Rows 1-5: Mixed nodes (normal 70%, elite 10%, event 10%, rest 10%)
     for (int row = 1; row < MAP_ROWS - 1; row++) {
         // Random nodes per row based on constants
         std::uniform_int_distribution<> nodeDist(MAP_MIN_NODES_PER_ROW, MAP_MAX_NODES_PER_ROW);
@@ -492,14 +493,14 @@ std::vector<MapNode> GenerateMap() {
             node.visited = false;
             node.reachable = false;
             
-            // Node type distribution (no shops)
+            // Node type distribution: 70% normal, 10% elite, 10% event, 10% rest
             std::uniform_int_distribution<> typeDist(0, 99);
             int typeRoll = typeDist(gen);
-            if (typeRoll < NODE_PROB_NORMAL) {
+            if (typeRoll < 70) {
                 node.type = NODE_NORMAL;
-            } else if (typeRoll < NODE_PROB_ELITE) {
+            } else if (typeRoll < 80) {
                 node.type = NODE_ELITE;
-            } else if (typeRoll < NODE_PROB_EVENT) {
+            } else if (typeRoll < 90) {
                 node.type = NODE_EVENT;
             } else {
                 node.type = NODE_REST;
