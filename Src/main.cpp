@@ -314,12 +314,12 @@ unsigned int GetNodeColor(NodeType type) {
 const char* GetNodeTypeName(NodeType type) {
     switch (type) {
         case NODE_START: return "Start";
-        case NODE_NORMAL: return "Battle";
-        case NODE_ELITE: return "Elite";
+        case NODE_NORMAL: return "Normal Battle";
+        case NODE_ELITE: return "Elite Battle";
         case NODE_EVENT: return "Event";
         case NODE_SHOP: return "Shop";
         case NODE_REST: return "Rest";
-        case NODE_BOSS: return "Boss";
+        case NODE_BOSS: return "Boss Battle";
         default: return "Unknown";
     }
 }
@@ -703,7 +703,7 @@ void DrawArrow(float x1, float y1, float x2, float y2, unsigned int color, float
 // Draw map scene
 void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highlightedNodeIndex) {
     // Draw title
-    DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - S道を選んでね");
+    DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - Select Road");
     
     // Get current row for comparison
     int currentRow = nodes[currentNodeIndex].row;
@@ -799,12 +799,12 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     if (highlightedNodeIndex >= 0 && highlightedNodeIndex < (int)nodes.size()) {
         const char* typeName = GetNodeTypeName(nodes[highlightedNodeIndex].type);
         DrawFormatString(SCREEN_WIDTH / 2 - 50, SCREEN_HEIGHT - 40, COLOR_BLACK, 
-                        "Node: %s", typeName);
+                        "Road: %s", typeName);
     }
     
     // Draw instructions
-    DrawFormatString(10, SCREEN_HEIGHT - 60, COLOR_BLACK, "Mouse: Click node to select");
-    DrawFormatString(10, SCREEN_HEIGHT - 40, COLOR_BLACK, "ESC: Quit");
+    DrawFormatString(10, SCREEN_HEIGHT - 60, COLOR_BLACK, "Mouse: Click Road to select");
+    DrawFormatString(10, SCREEN_HEIGHT - 40, COLOR_BLACK, "ESC: Quit Game");
 }
 
 // Update reachability after selecting a node
@@ -925,14 +925,14 @@ void DrawGameOverScreen(int selectedOption) {
     unsigned int retryColor = (selectedOption == 0) ? COLOR_YELLOW : COLOR_WHITE;
     DrawBox(OPTION_X, retryY, OPTION_X + GAME_OVER_OPTION_BOX_WIDTH, retryY + GAME_OVER_OPTION_BOX_HEIGHT, retryColor, TRUE);
     DrawBox(OPTION_X, retryY, OPTION_X + GAME_OVER_OPTION_BOX_WIDTH, retryY + GAME_OVER_OPTION_BOX_HEIGHT, COLOR_BLACK, FALSE);
-    DrawFormatString(OPTION_X + 40, retryY + 20, COLOR_BLACK, "Retry (Restart Run)");
+    DrawFormatString(OPTION_X + 40, retryY + 20, COLOR_BLACK, "Retry");
     
     // Return to title option
     int titleY = GAME_OVER_OPTION_START_Y + GAME_OVER_OPTION_BOX_HEIGHT + GAME_OVER_OPTION_SPACING;
     unsigned int titleColor = (selectedOption == 1) ? COLOR_YELLOW : COLOR_WHITE;
     DrawBox(OPTION_X, titleY, OPTION_X + GAME_OVER_OPTION_BOX_WIDTH, titleY + GAME_OVER_OPTION_BOX_HEIGHT, titleColor, TRUE);
     DrawBox(OPTION_X, titleY, OPTION_X + GAME_OVER_OPTION_BOX_WIDTH, titleY + GAME_OVER_OPTION_BOX_HEIGHT, COLOR_BLACK, FALSE);
-    DrawFormatString(OPTION_X + 45, titleY + 20, COLOR_BLACK, "Return to Title");
+    DrawFormatString(OPTION_X + 45, titleY + 20, COLOR_BLACK, "to Title");
     
     // Draw instructions
     DrawFormatString(SCREEN_WIDTH / 2 - 80, 500, COLOR_BLACK, "Mouse: Click on option");
@@ -1388,9 +1388,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
                 
                 // Draw aim phase instructions
-                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION, COLOR_BLACK, "Aim Phase");
-                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 20, COLOR_BLACK, "Drag from player to aim");
-                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 40, COLOR_BLACK, "Release to start battle");
+                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 40, COLOR_BLACK, "Aim Phase");
+                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 60, COLOR_BLACK, "Drag from player to aim");
+                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 80, COLOR_BLACK, "Release to start battle");
                 
             } else if (!battleEnded) {
                 // Update hit-stop timer
@@ -1745,7 +1745,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     DrawFormatString(boxX + 5, boxY + 55, COLOR_BLACK, "Now: %d%%", (int)(playerChar.critRate * 100));
                 } else if (i == 1) {
                     // Weapon length reward
-                    DrawFormatString(boxX + 5, boxY + 15, COLOR_BLACK, "Weapon +%d", (int)(5 * rewardMultiplier));
+                    DrawFormatString(boxX + 5, boxY + 15, COLOR_BLACK, "WeaponLength +%d", (int)(5 * rewardMultiplier));
                     DrawFormatString(boxX + 5, boxY + 35, COLOR_BLACK, "(Length)");
                     DrawFormatString(boxX + 5, boxY + 55, COLOR_BLACK, "Now: %.0f", playerChar.weapon.length);
                 }
@@ -1932,7 +1932,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     engX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
                     NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
                     COLOR_BLACK, FALSE);
-            DrawFormatString(engX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "English");
+            DrawFormatString(engX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "English 1");
             
             // Symbols
             int symX = engX + NAME_ENTRY_MODE_BUTTON_WIDTH + NAME_ENTRY_KEY_SPACING;
@@ -1945,7 +1945,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     symX + NAME_ENTRY_MODE_BUTTON_WIDTH, 
                     NAME_ENTRY_MODE_BUTTON_Y + NAME_ENTRY_MODE_BUTTON_HEIGHT, 
                     COLOR_BLACK, FALSE);
-            DrawFormatString(symX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "Symbols");
+            DrawFormatString(symX + 20, NAME_ENTRY_MODE_BUTTON_Y + 10, COLOR_BLACK, "English 2");
             
             // Draw keyboard
             for (size_t i = 0; i < charSet.size(); i++) {
