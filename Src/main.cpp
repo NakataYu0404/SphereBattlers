@@ -167,6 +167,7 @@ struct Circle {
     bool isAlive;       // Whether player is alive
     float hitCooldown;  // Cooldown timer before can be hit again (counts down)
     bool wasHitLastFrame;  // Track if was being hit last frame (for separation detection)
+    float critRate;     // Critical hit rate (0.0 to 1.0)
 };
 
 // Helper function to clamp HP to valid range
@@ -192,7 +193,24 @@ void ResetMapInputState(float& cooldown, bool& prevEnter, bool& prevSpace, int& 
     prevMouse = GetMouseInput();  // Update to current state to prevent immediate re-trigger
 }
 
-// Helper function to calculate total weapon damage for a character
+// Helper function to calculate total weapon damage for a character (with crit chance)
+int GetTotalWeaponDamage(const Circle& character, bool& isCrit) {
+    int baseDamage = WEAPON_DAMAGE + character.weaponDamage;
+    
+    // Check for critical hit
+    static std::mt19937 critGen(std::random_device{}());
+    std::uniform_real_distribution<float> critDist(0.0f, 1.0f);
+    
+    if (critDist(critGen) < character.critRate) {
+        isCrit = true;
+        return (int)(baseDamage * 1.5f);
+    }
+    
+    isCrit = false;
+    return baseDamage;
+}
+
+// Helper function to calculate total weapon damage for display (no crit)
 int GetTotalWeaponDamage(const Circle& character) {
     return WEAPON_DAMAGE + character.weaponDamage;
 }
@@ -657,15 +675,6 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     // Draw title
     DrawFormatString(SCREEN_WIDTH / 2 - 50, 20, COLOR_BLACK, "Map - Select Path");
     
-    // Draw edges first (behind nodes) - basic gray edges
-    for (size_t i = 0; i < nodes.size(); i++) {
-        for (int connectedIdx : nodes[i].connectedNodes) {
-            DrawLineAA(nodes[i].x, nodes[i].y, 
-                      nodes[connectedIdx].x, nodes[connectedIdx].y, 
-                      COLOR_GRAY, 2.0f);
-        }
-    }
-    
     // Draw blue arrows for passed route (from start to current node)
     int nodeIdx = currentNodeIndex;
     while (nodeIdx != -1 && nodes[nodeIdx].parentNodeIndex != -1) {
@@ -719,7 +728,7 @@ void DrawMap(const std::vector<MapNode>& nodes, int currentNodeIndex, int highli
     }
     
     // Draw instructions
-    DrawFormatString(10, SCREEN_HEIGHT - 60, COLOR_BLACK, "Mouse: Click | Keys: Arrow/WASD + Enter/Space");
+    DrawFormatString(10, SCREEN_HEIGHT - 60, COLOR_BLACK, "Mouse: Click node to select");
     DrawFormatString(10, SCREEN_HEIGHT - 40, COLOR_BLACK, "ESC: Quit");
 }
 
@@ -745,6 +754,7 @@ void ResetPlayerCharacter(Circle& playerChar) {
     playerChar.vx = PLAYER_INITIAL_VX;
     playerChar.vy = PLAYER_INITIAL_VY;
     playerChar.angularVel = PLAYER_INITIAL_ANGULAR_VEL;
+    playerChar.critRate = 0.0f;
 }
 
 // Draw title screen
@@ -753,8 +763,7 @@ void DrawTitleScreen() {
     DrawFormatString(SCREEN_WIDTH / 2 - 100, 200, COLOR_BLACK, "SPHERE BATTLERS");
     
     // Draw start instruction
-    DrawFormatString(SCREEN_WIDTH / 2 - 120, 300, COLOR_BLACK, "Press Enter/Space to Start");
-    DrawFormatString(SCREEN_WIDTH / 2 - 80, 320, COLOR_BLACK, "or Click Anywhere");
+    DrawFormatString(SCREEN_WIDTH / 2 - 80, 300, COLOR_BLACK, "Click Anywhere to Start");
     
     // Draw controls info
     DrawFormatString(SCREEN_WIDTH / 2 - 80, 400, COLOR_BLACK, "ESC: Quit");
@@ -783,13 +792,13 @@ void DrawGameOverScreen(int selectedOption) {
     DrawFormatString(OPTION_X + 45, titleY + 20, COLOR_BLACK, "Return to Title");
     
     // Draw instructions
-    DrawFormatString(SCREEN_WIDTH / 2 - 120, 500, COLOR_BLACK, "Mouse: Click | Keys: Up/Down + Enter/Space");
+    DrawFormatString(SCREEN_WIDTH / 2 - 80, 500, COLOR_BLACK, "Mouse: Click on option");
 }
 
 // Initialize battle characters
 void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar, 
                       NodeType nodeType, const std::vector<MapNode>& mapNodes, int currentNodeIndex) {
-    // Initialize player
+    // Initialize battle characters
     player = playerChar;
     player.x = FRAME_LEFT + FRAME_WIDTH * 0.3f;
     player.y = FRAME_BOTTOM - 80.0f;
@@ -810,6 +819,7 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
     enemy.maxHP = MAX_HP;
     enemy.weaponDamage = 0;
     enemy.baseSpeed = 1.0f;
+    enemy.critRate = 0.0f;
     
     // Set enemy parameters based on node type
     if (nodeType == NODE_BOSS) {
@@ -919,6 +929,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     playerChar.maxHP = MAX_HP;
     playerChar.weaponDamage = 0;
     playerChar.baseSpeed = 1.0f;
+    playerChar.critRate = 0.0f;
     
     // Mouse state tracking
     int prevMouseState = 0;
@@ -953,40 +964,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             
             DrawTitleScreen();
             
-            // Handle input to start game
-            bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
-            bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
-            
-            // Mouse click
+            // Mouse click only to start
             int mouseState = GetMouseInput();
             bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
             prevMouseState = mouseState;
             
-            if (enterPressed || spacePressed || mouseClicked) {
+            if (mouseClicked) {
                 // Start game - transition to map
                 currentScene = SCENE_MAP;
             }
             
         } else if (currentScene == SCENE_GAME_OVER) {
             // ===== GAME OVER SCENE =====
-            
-            // Handle keyboard navigation (Up/Down)
-            if (keyPressDelay > 0) {
-                keyPressDelay--;
-            }
-            
-            if (keyPressDelay == 0) {
-                bool moveUp = CheckHitKey(KEY_INPUT_UP) || CheckHitKey(KEY_INPUT_W);
-                bool moveDown = CheckHitKey(KEY_INPUT_DOWN) || CheckHitKey(KEY_INPUT_S);
-                
-                if (moveUp) {
-                    gameOverSelectedOption = (gameOverSelectedOption - 1 + GAME_OVER_NUM_OPTIONS) % GAME_OVER_NUM_OPTIONS;
-                    keyPressDelay = KEY_PRESS_COOLDOWN;
-                } else if (moveDown) {
-                    gameOverSelectedOption = (gameOverSelectedOption + 1) % GAME_OVER_NUM_OPTIONS;
-                    keyPressDelay = KEY_PRESS_COOLDOWN;
-                }
-            }
             
             // Handle mouse hover
             int mouseX, mouseY;
@@ -1008,14 +997,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 gameOverSelectedOption = 1;
             }
             
-            // Handle selection
-            bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
-            bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
+            // Handle mouse click selection only
             int mouseState = GetMouseInput();
             bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
             prevMouseState = mouseState;
             
-            if (enterPressed || spacePressed || mouseClicked) {
+            if (mouseClicked) {
                 if (gameOverSelectedOption == 0) {
                     // Retry - restart from beginning
                     mapNodes = GenerateMap();
@@ -1065,104 +1052,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 if (distSq < MAP_NODE_RADIUS * MAP_NODE_RADIUS) {
                     highlightedNodeIndex = (int)i;
                     break;
-                }
-            }
-            
-            // Handle keyboard navigation
-            if (keyPressDelay > 0) {
-                keyPressDelay--;
-            }
-            
-            if (keyPressDelay == 0) {
-                // Find reachable nodes
-                std::vector<int> reachableIndices;
-                for (size_t i = 0; i < mapNodes.size(); i++) {
-                    if (mapNodes[i].reachable && !mapNodes[i].visited) {
-                        reachableIndices.push_back((int)i);
-                    }
-                }
-                
-                if (!reachableIndices.empty()) {
-                    // If no node highlighted, start with first reachable
-                    if (highlightedNodeIndex == -1 || !mapNodes[highlightedNodeIndex].reachable || mapNodes[highlightedNodeIndex].visited) {
-                        highlightedNodeIndex = reachableIndices[0];
-                    }
-                    
-                    // Find current position in reachable list
-                    int currentPosInReachable = 0;
-                    for (size_t i = 0; i < reachableIndices.size(); i++) {
-                        if (reachableIndices[i] == highlightedNodeIndex) {
-                            currentPosInReachable = (int)i;
-                            break;
-                        }
-                    }
-                    
-                    // Arrow keys or WASD to navigate
-                    bool moveLeft = CheckHitKey(KEY_INPUT_LEFT) || CheckHitKey(KEY_INPUT_A);
-                    bool moveRight = CheckHitKey(KEY_INPUT_RIGHT) || CheckHitKey(KEY_INPUT_D);
-                    bool moveUp = CheckHitKey(KEY_INPUT_UP) || CheckHitKey(KEY_INPUT_W);
-                    bool moveDown = CheckHitKey(KEY_INPUT_DOWN) || CheckHitKey(KEY_INPUT_S);
-                    
-                    if (moveLeft || moveUp) {
-                        currentPosInReachable = (currentPosInReachable - 1 + (int)reachableIndices.size()) % (int)reachableIndices.size();
-                        highlightedNodeIndex = reachableIndices[currentPosInReachable];
-                        keyPressDelay = KEY_PRESS_COOLDOWN;
-                    } else if (moveRight || moveDown) {
-                        currentPosInReachable = (currentPosInReachable + 1) % (int)reachableIndices.size();
-                        highlightedNodeIndex = reachableIndices[currentPosInReachable];
-                        keyPressDelay = KEY_PRESS_COOLDOWN;
-                    }
-                    
-                    // Enter or Space to select (with edge detection and cooldown)
-                    bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
-                    bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
-                    
-                    if ((enterPressed || spacePressed) && highlightedNodeIndex >= 0 && mapInputCooldown <= 0.0f) {
-                        // Select this node
-                        currentNodeIndex = highlightedNodeIndex;
-                        mapNodes[currentNodeIndex].visited = true;
-                        
-                        // Update reachability
-                        UpdateReachability(mapNodes, currentNodeIndex);
-                        
-                        // Enter battle scene based on node type
-                        if (mapNodes[currentNodeIndex].type == NODE_NORMAL || 
-                            mapNodes[currentNodeIndex].type == NODE_ELITE || 
-                            mapNodes[currentNodeIndex].type == NODE_BOSS) {
-                            currentScene = SCENE_BATTLE;
-                            
-                            // Initialize battle
-                            InitializeBattle(circles[0], circles[1], playerChar, 
-                                           mapNodes[currentNodeIndex].type, mapNodes, currentNodeIndex);
-                            
-                            hitStopTimer = 0.0f;
-                            battleEnded = false;
-                            playerWon = false;
-                            battlePhase = BATTLE_PHASE_AIM;
-                            aimPhaseActive = true;
-                            aimMouseDragging = false;
-                            aimKeyboardDirX = 0.0f;
-                            aimKeyboardDirY = 0.0f;
-                            aimKeyboardActive = false;
-                        } else if (mapNodes[currentNodeIndex].type == NODE_REST) {
-                            // Rest node healing
-                            // Boss-ante rest (row before boss) heals fully, general rest heals 50%
-                            int healAmount;
-                            if (mapNodes[currentNodeIndex].row == MAP_ROWS - 2) {
-                                // Boss-ante rest: heal to full maxHP
-                                healAmount = playerChar.maxHP - playerChar.hp;
-                            } else {
-                                // General rest: heal 50% of maxHP
-                                healAmount = playerChar.maxHP / 2;
-                            }
-                            playerChar.hp = ClampHP(playerChar.hp + healAmount, playerChar.maxHP);
-                            keyPressDelay = KEY_PRESS_COOLDOWN * 2;
-                        } else {
-                            // Other node types (event) - just return to map for now
-                            // In a full implementation, these would have their own scenes
-                            keyPressDelay = KEY_PRESS_COOLDOWN * 2;
-                        }
-                    }
                 }
             }
             
@@ -1243,7 +1132,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         aimMouseDragging = true;
                         aimMouseStartX = mouseX;
                         aimMouseStartY = mouseY;
-                        aimKeyboardActive = false;  // Disable keyboard aiming when mouse dragging
                     }
                 }
                 
@@ -1276,57 +1164,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     }
                 }
                 
-                // Keyboard aiming mechanics (only if not mouse dragging)
-                if (!aimMouseDragging) {
-                    bool leftKey = CheckHitKey(KEY_INPUT_LEFT) || CheckHitKey(KEY_INPUT_A);
-                    bool rightKey = CheckHitKey(KEY_INPUT_RIGHT) || CheckHitKey(KEY_INPUT_D);
-                    bool upKey = CheckHitKey(KEY_INPUT_UP) || CheckHitKey(KEY_INPUT_W);
-                    bool downKey = CheckHitKey(KEY_INPUT_DOWN) || CheckHitKey(KEY_INPUT_S);
-                    
-                    if (leftKey || rightKey || upKey || downKey) {
-                        aimKeyboardActive = true;
-                        aimKeyboardDirX = 0.0f;
-                        aimKeyboardDirY = 0.0f;
-                        
-                        if (leftKey) aimKeyboardDirX -= 1.0f;
-                        if (rightKey) aimKeyboardDirX += 1.0f;
-                        if (upKey) aimKeyboardDirY -= 1.0f;
-                        if (downKey) aimKeyboardDirY += 1.0f;
-                        
-                        // Normalize direction
-                        float mag = sqrtf(aimKeyboardDirX * aimKeyboardDirX + aimKeyboardDirY * aimKeyboardDirY);
-                        if (mag > 0.1f) {
-                            aimKeyboardDirX /= mag;
-                            aimKeyboardDirY /= mag;
-                        }
-                    } else if (aimKeyboardActive) {
-                        // Keys released without confirmation - reset
-                        aimKeyboardActive = false;
-                    }
-                    
-                    // Confirm with Enter/Space
-                    bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
-                    bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
-                    
-                    if ((enterPressed || spacePressed) && aimKeyboardActive) {
-                        // Set velocity based on keyboard direction
-                        float baseSpeedMag = sqrtf(circles[0].vx * circles[0].vx + circles[0].vy * circles[0].vy);
-                        if (baseSpeedMag < 0.1f) baseSpeedMag = AIM_DEFAULT_SPEED_MAG;
-                        
-                        circles[0].vx = aimKeyboardDirX * baseSpeedMag;
-                        circles[0].vy = aimKeyboardDirY * baseSpeedMag;
-                        
-                        // End aim phase
-                        aimPhaseActive = false;
-                        battlePhase = BATTLE_PHASE_FIGHTING;
-                        aimKeyboardActive = false;
-                    } else if ((enterPressed || spacePressed) && !aimKeyboardActive) {
-                        // Enter/Space without keyboard input - use default velocity
-                        aimPhaseActive = false;
-                        battlePhase = BATTLE_PHASE_FIGHTING;
-                    }
-                }
-                
                 // Draw characters in aim phase (static, no movement)
                 for (int i = 0; i < 2; i++) {
                     // Draw circle with outline
@@ -1338,7 +1175,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                                    (int)(circles[i].y + CIRCLE_NUMBER_Y_OFFSET), COLOR_BLACK, "%d", circles[i].hp);
                 }
                 
-                // Draw player aim arrow (yellow)
+                // Draw player aim arrow (cyan)
                 if (aimMouseDragging) {
                     // Mouse drag arrow
                     float dx = mouseX - playerCenterX;
@@ -1367,24 +1204,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         DrawLineAA(endX, endY, headX1, headY1, COLOR_CYAN, 3.0f);
                         DrawLineAA(endX, endY, headX2, headY2, COLOR_CYAN, 3.0f);
                     }
-                } else if (aimKeyboardActive) {
-                    // Keyboard direction arrow
-                    float endX = playerCenterX + aimKeyboardDirX * AIM_ARROW_LENGTH;
-                    float endY = playerCenterY + aimKeyboardDirY * AIM_ARROW_LENGTH;
-                    
-                    // Draw arrow line
-                    DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_CYAN, 3.0f);
-                    
-                    // Draw arrowhead
-                    float arrowHeadLen = 10.0f;
-                    float arrowHeadAngle = 0.5f;
-                    float headX1 = endX - aimKeyboardDirX * arrowHeadLen * cosf(arrowHeadAngle) + aimKeyboardDirY * arrowHeadLen * sinf(arrowHeadAngle);
-                    float headY1 = endY - aimKeyboardDirY * arrowHeadLen * cosf(arrowHeadAngle) - aimKeyboardDirX * arrowHeadLen * sinf(arrowHeadAngle);
-                    float headX2 = endX - aimKeyboardDirX * arrowHeadLen * cosf(arrowHeadAngle) - aimKeyboardDirY * arrowHeadLen * sinf(arrowHeadAngle);
-                    float headY2 = endY - aimKeyboardDirY * arrowHeadLen * cosf(arrowHeadAngle) + aimKeyboardDirX * arrowHeadLen * sinf(arrowHeadAngle);
-                    
-                    DrawLineAA(endX, endY, headX1, headY1, COLOR_CYAN, 3.0f);
-                    DrawLineAA(endX, endY, headX2, headY2, COLOR_CYAN, 3.0f);
                 }
                 
                 // Draw enemy aim arrow (red, fixed initial direction)
@@ -1417,8 +1236,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 
                 // Draw aim phase instructions
                 DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION, COLOR_BLACK, "Aim Phase");
-                DrawFormatString(SCREEN_WIDTH / 2 - 150, TITLE_Y_POSITION + 20, COLOR_BLACK, "Drag from player or use Arrow/WASD + Enter");
-                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 40, COLOR_BLACK, "Enter/Space: Start with default");
+                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 20, COLOR_BLACK, "Drag from player to aim");
+                DrawFormatString(SCREEN_WIDTH / 2 - 100, TITLE_Y_POSITION + 40, COLOR_BLACK, "Release to start battle");
                 
             } else if (!battleEnded) {
                 // Update hit-stop timer
@@ -1471,7 +1290,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             // Apply damage only if cooldown expired and we had separation
                             if (circles[1].hitCooldown <= 0.0f && !circles[1].wasHitLastFrame) {
                                 circles[1].hitTimer = HIT_FEEDBACK_DURATION;
-                                circles[1].hp -= GetTotalWeaponDamage(circles[0]);
+                                bool isCrit = false;
+                                int damage = GetTotalWeaponDamage(circles[0], isCrit);
+                                circles[1].hp -= damage;
                                 if (circles[1].hp <= 0) {
                                     circles[1].isAlive = false;
                                     battleEnded = true;
@@ -1491,7 +1312,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             // Apply damage only if cooldown expired and we had separation
                             if (circles[0].hitCooldown <= 0.0f && !circles[0].wasHitLastFrame) {
                                 circles[0].hitTimer = HIT_FEEDBACK_DURATION;
-                                circles[0].hp -= GetTotalWeaponDamage(circles[1]);
+                                bool isCrit = false;
+                                int damage = GetTotalWeaponDamage(circles[1], isCrit);
+                                circles[0].hp -= damage;
                                 if (circles[0].hp <= 0) {
                                     circles[0].isAlive = false;
                                     battleEnded = true;
@@ -1524,16 +1347,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     }
                 }
             } else {
-                // Battle ended - wait for input to continue
-                bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
-                bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
-                
+                // Battle ended - wait for mouse click to continue
                 // Check for mouse click (edge trigger)
                 int mouseState = GetMouseInput();
                 bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
                 prevMouseState = mouseState;
                 
-                if (enterPressed || spacePressed || (mouseClicked && playerWon)) {
+                if (mouseClicked) {
                     if (playerWon) {
                         // Update player character state
                         playerChar.hp = circles[0].hp;
@@ -1564,6 +1384,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                             playerChar.maxHP = MAX_HP;
                             playerChar.weaponDamage = 0;
                             playerChar.baseSpeed = 1.0f;
+                            playerChar.critRate = 0.0f;
                             
                             // Set input cooldown and clear input state before returning to map
                             ResetMapInputState(mapInputCooldown, prevEnterKeyState, prevSpaceKeyState, prevMouseState);
@@ -1632,10 +1453,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if (battleEnded) {
                 if (playerWon) {
                     DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Victory!");
-                    DrawFormatString(SCREEN_WIDTH / 2 - 120, TITLE_Y_POSITION + 20, COLOR_BLACK, "Click or press Enter/Space to continue");
+                    DrawFormatString(SCREEN_WIDTH / 2 - 80, TITLE_Y_POSITION + 20, COLOR_BLACK, "Click to continue");
                 } else {
                     DrawFormatString(SCREEN_WIDTH / 2 - 50, TITLE_Y_POSITION, COLOR_BLACK, "Defeat!");
-                    DrawFormatString(SCREEN_WIDTH / 2 - 120, TITLE_Y_POSITION + 20, COLOR_BLACK, "Press Enter/Space to continue");
+                    DrawFormatString(SCREEN_WIDTH / 2 - 80, TITLE_Y_POSITION + 20, COLOR_BLACK, "Click to continue");
                 }
             } else {
                 // Draw title text at top
@@ -1646,7 +1467,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             // ===== REWARD SELECTION SCENE =====
             
             // Reward selection state (persistent across frames in this scene)
-            static int selectedReward = 0;  // 0 = HP, 1 = Attack, 2 = Speed
+            static int selectedReward = 0;  // 0 = HP, 1 = Attack, 2 = Speed, 3 = Crit, 4 = Weapon Length
             static bool rewardSceneInitialized = false;
             static NodeType lastBattleNodeType = NODE_NORMAL;
             
@@ -1665,38 +1486,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 mapInputCooldown -= 1.0f;
             }
             
-            // Define reward option rectangles
-            const int REWARD_BOX_WIDTH = 160;
-            const int REWARD_BOX_HEIGHT = 100;
-            const int REWARD_SPACING = 20;
-            const int REWARD_START_X = (SCREEN_WIDTH - (REWARD_BOX_WIDTH * 3 + REWARD_SPACING * 2)) / 2;
-            const int REWARD_Y = 250;
-            
-            // Handle keyboard navigation (Left/Right)
-            if (keyPressDelay > 0) {
-                keyPressDelay--;
-            }
-            
-            if (keyPressDelay == 0) {
-                bool moveLeft = CheckHitKey(KEY_INPUT_LEFT) || CheckHitKey(KEY_INPUT_A);
-                bool moveRight = CheckHitKey(KEY_INPUT_RIGHT) || CheckHitKey(KEY_INPUT_D);
-                
-                if (moveLeft) {
-                    selectedReward = (selectedReward - 1 + 3) % 3;
-                    keyPressDelay = KEY_PRESS_COOLDOWN;
-                } else if (moveRight) {
-                    selectedReward = (selectedReward + 1) % 3;
-                    keyPressDelay = KEY_PRESS_COOLDOWN;
-                }
-            }
+            // Define reward option rectangles (5 rewards, 2 rows)
+            const int REWARD_BOX_WIDTH = 140;
+            const int REWARD_BOX_HEIGHT = 90;
+            const int REWARD_SPACING = 15;
+            const int REWARD_TOP_ROW_Y = 220;
+            const int REWARD_BOTTOM_ROW_Y = 330;
+            const int REWARD_TOP_START_X = (SCREEN_WIDTH - (REWARD_BOX_WIDTH * 3 + REWARD_SPACING * 2)) / 2;
+            const int REWARD_BOTTOM_START_X = (SCREEN_WIDTH - (REWARD_BOX_WIDTH * 2 + REWARD_SPACING)) / 2;
             
             // Handle mouse hover
             int mouseX, mouseY;
             GetMousePoint(&mouseX, &mouseY);
             
+            // Check top row (3 rewards)
             for (int i = 0; i < 3; i++) {
-                int boxX = REWARD_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
-                int boxY = REWARD_Y;
+                int boxX = REWARD_TOP_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
+                int boxY = REWARD_TOP_ROW_Y;
                 
                 if (mouseX >= boxX && mouseX <= boxX + REWARD_BOX_WIDTH &&
                     mouseY >= boxY && mouseY <= boxY + REWARD_BOX_HEIGHT) {
@@ -1704,13 +1510,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
             }
             
-            // Handle selection (Enter/Space or mouse click)
-            bool enterPressed = DetectKeyPressEdge(KEY_INPUT_RETURN, prevEnterKeyState);
-            bool spacePressed = DetectKeyPressEdge(KEY_INPUT_SPACE, prevSpaceKeyState);
+            // Check bottom row (2 rewards)
+            for (int i = 0; i < 2; i++) {
+                int boxX = REWARD_BOTTOM_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
+                int boxY = REWARD_BOTTOM_ROW_Y;
+                
+                if (mouseX >= boxX && mouseX <= boxX + REWARD_BOX_WIDTH &&
+                    mouseY >= boxY && mouseY <= boxY + REWARD_BOX_HEIGHT) {
+                    selectedReward = i + 3;
+                }
+            }
+            
+            // Handle mouse click selection only
             int mouseState = GetMouseInput();
             bool mouseClicked = (mouseState & MOUSE_INPUT_LEFT) && !(prevMouseState & MOUSE_INPUT_LEFT);
             
-            if ((enterPressed || spacePressed || mouseClicked) && mapInputCooldown <= 0.0f) {
+            if (mouseClicked && mapInputCooldown <= 0.0f) {
                 // Apply selected reward with multiplier
                 if (selectedReward == 0) {
                     // Max HP +10 * multiplier, also heal by the same amount (clamped to new maxHP)
@@ -1730,6 +1545,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         playerChar.vx *= speedMult;
                         playerChar.vy *= speedMult;
                     }
+                } else if (selectedReward == 3) {
+                    // Crit rate +5% * multiplier
+                    playerChar.critRate += 0.05f * rewardMultiplier;
+                    // Clamp to max 100%
+                    if (playerChar.critRate > 1.0f) playerChar.critRate = 1.0f;
+                } else if (selectedReward == 4) {
+                    // Weapon length +5 * multiplier
+                    playerChar.weapon.length += 5.0f * rewardMultiplier;
                 }
                 
                 // Reset reward scene for next time
@@ -1748,9 +1571,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 DrawFormatString(SCREEN_WIDTH / 2 - 90, 180, COLOR_BLACK, "Elite Victory: %dx rewards!", rewardMultiplier);
             }
             
+            // Draw top row rewards (0, 1, 2)
             for (int i = 0; i < 3; i++) {
-                int boxX = REWARD_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
-                int boxY = REWARD_Y;
+                int boxX = REWARD_TOP_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
+                int boxY = REWARD_TOP_ROW_Y;
                 
                 // Draw box background
                 unsigned int boxColor = (i == selectedReward) ? COLOR_YELLOW : COLOR_WHITE;
@@ -1759,22 +1583,46 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 
                 // Draw reward text
                 if (i == 0) {
-                    DrawFormatString(boxX + 15, boxY + 20, COLOR_BLACK, "Max HP +%d", 10 * rewardMultiplier);
-                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(+HP healing)");
-                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", playerChar.maxHP);
+                    DrawFormatString(boxX + 10, boxY + 15, COLOR_BLACK, "Max HP +%d", 10 * rewardMultiplier);
+                    DrawFormatString(boxX + 5, boxY + 35, COLOR_BLACK, "(+HP healing)");
+                    DrawFormatString(boxX + 5, boxY + 55, COLOR_BLACK, "Now: %d", playerChar.maxHP);
                 } else if (i == 1) {
-                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Attack +%d", 1 * rewardMultiplier);
-                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Weapon dmg)");
-                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %d", GetTotalWeaponDamage(playerChar));
+                    DrawFormatString(boxX + 15, boxY + 15, COLOR_BLACK, "Attack +%d", 1 * rewardMultiplier);
+                    DrawFormatString(boxX + 5, boxY + 35, COLOR_BLACK, "(Weapon dmg)");
+                    DrawFormatString(boxX + 5, boxY + 55, COLOR_BLACK, "Now: %d", GetTotalWeaponDamage(playerChar));
                 } else if (i == 2) {
-                    DrawFormatString(boxX + 20, boxY + 20, COLOR_BLACK, "Speed +%.1f", 0.1f * rewardMultiplier);
-                    DrawFormatString(boxX + 10, boxY + 45, COLOR_BLACK, "(Movement)");
-                    DrawFormatString(boxX + 10, boxY + 65, COLOR_BLACK, "Now: %.1f", playerChar.baseSpeed);
+                    DrawFormatString(boxX + 15, boxY + 15, COLOR_BLACK, "Speed +%.1f", 0.1f * rewardMultiplier);
+                    DrawFormatString(boxX + 5, boxY + 35, COLOR_BLACK, "(Movement)");
+                    DrawFormatString(boxX + 5, boxY + 55, COLOR_BLACK, "Now: %.1f", playerChar.baseSpeed);
+                }
+            }
+            
+            // Draw bottom row rewards (3, 4)
+            for (int i = 0; i < 2; i++) {
+                int boxX = REWARD_BOTTOM_START_X + i * (REWARD_BOX_WIDTH + REWARD_SPACING);
+                int boxY = REWARD_BOTTOM_ROW_Y;
+                
+                // Draw box background
+                unsigned int boxColor = (i + 3 == selectedReward) ? COLOR_YELLOW : COLOR_WHITE;
+                DrawBox(boxX, boxY, boxX + REWARD_BOX_WIDTH, boxY + REWARD_BOX_HEIGHT, boxColor, TRUE);
+                DrawBox(boxX, boxY, boxX + REWARD_BOX_WIDTH, boxY + REWARD_BOX_HEIGHT, COLOR_BLACK, FALSE);
+                
+                // Draw reward text
+                if (i == 0) {
+                    // Crit rate reward
+                    DrawFormatString(boxX + 10, boxY + 15, COLOR_BLACK, "Crit +%d%%", (int)(5 * rewardMultiplier));
+                    DrawFormatString(boxX + 5, boxY + 35, COLOR_BLACK, "(1.5x dmg)");
+                    DrawFormatString(boxX + 5, boxY + 55, COLOR_BLACK, "Now: %d%%", (int)(playerChar.critRate * 100));
+                } else if (i == 1) {
+                    // Weapon length reward
+                    DrawFormatString(boxX + 5, boxY + 15, COLOR_BLACK, "Weapon +%d", (int)(5 * rewardMultiplier));
+                    DrawFormatString(boxX + 5, boxY + 35, COLOR_BLACK, "(Length)");
+                    DrawFormatString(boxX + 5, boxY + 55, COLOR_BLACK, "Now: %.0f", playerChar.weapon.length);
                 }
             }
             
             // Draw instructions
-            DrawFormatString(SCREEN_WIDTH / 2 - 120, 400, COLOR_BLACK, "Mouse: Click | Keys: Left/Right + Enter/Space");
+            DrawFormatString(SCREEN_WIDTH / 2 - 80, 450, COLOR_BLACK, "Mouse: Click on reward");
         }
         
         ScreenFlip();
