@@ -1117,7 +1117,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         float endY = playerCenterY + dirY * arrowLen;
                         
                         // Draw arrow line
-                        DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_YELLOW, 3.0f);
+                        DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_CYAN, 3.0f);
                         
                         // Draw arrowhead
                         float arrowHeadLen = 10.0f;
@@ -1127,8 +1127,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                         float headX2 = endX - dirX * arrowHeadLen * cosf(arrowHeadAngle) - dirY * arrowHeadLen * sinf(arrowHeadAngle);
                         float headY2 = endY - dirY * arrowHeadLen * cosf(arrowHeadAngle) + dirX * arrowHeadLen * sinf(arrowHeadAngle);
                         
-                        DrawLineAA(endX, endY, headX1, headY1, COLOR_YELLOW, 3.0f);
-                        DrawLineAA(endX, endY, headX2, headY2, COLOR_YELLOW, 3.0f);
+                        DrawLineAA(endX, endY, headX1, headY1, COLOR_CYAN, 3.0f);
+                        DrawLineAA(endX, endY, headX2, headY2, COLOR_CYAN, 3.0f);
                     }
                 } else if (aimKeyboardActive) {
                     // Keyboard direction arrow
@@ -1136,7 +1136,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     float endY = playerCenterY + aimKeyboardDirY * AIM_ARROW_LENGTH;
                     
                     // Draw arrow line
-                    DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_YELLOW, 3.0f);
+                    DrawLineAA(playerCenterX, playerCenterY, endX, endY, COLOR_CYAN, 3.0f);
                     
                     // Draw arrowhead
                     float arrowHeadLen = 10.0f;
@@ -1146,11 +1146,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     float headX2 = endX - aimKeyboardDirX * arrowHeadLen * cosf(arrowHeadAngle) - aimKeyboardDirY * arrowHeadLen * sinf(arrowHeadAngle);
                     float headY2 = endY - aimKeyboardDirY * arrowHeadLen * cosf(arrowHeadAngle) + aimKeyboardDirX * arrowHeadLen * sinf(arrowHeadAngle);
                     
-                    DrawLineAA(endX, endY, headX1, headY1, COLOR_YELLOW, 3.0f);
-                    DrawLineAA(endX, endY, headX2, headY2, COLOR_YELLOW, 3.0f);
+                    DrawLineAA(endX, endY, headX1, headY1, COLOR_CYAN, 3.0f);
+                    DrawLineAA(endX, endY, headX2, headY2, COLOR_CYAN, 3.0f);
                 }
                 
-                // Draw enemy aim arrow (cyan, fixed initial direction)
+                // Draw enemy aim arrow (red, fixed initial direction)
                 float enemyCenterX = circles[1].x;
                 float enemyCenterY = circles[1].y;
                 float enemyVx = circles[1].vx;
@@ -1164,7 +1164,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     float enemyEndY = enemyCenterY + enemyDirY * AIM_ARROW_LENGTH;
                     
                     // Draw arrow line
-                    DrawLineAA(enemyCenterX, enemyCenterY, enemyEndX, enemyEndY, COLOR_CYAN, 3.0f);
+                    DrawLineAA(enemyCenterX, enemyCenterY, enemyEndX, enemyEndY, COLOR_RED, 3.0f);
                     
                     // Draw arrowhead
                     float arrowHeadLen = 10.0f;
@@ -1174,8 +1174,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     float headX2 = enemyEndX - enemyDirX * arrowHeadLen * cosf(arrowHeadAngle) - enemyDirY * arrowHeadLen * sinf(arrowHeadAngle);
                     float headY2 = enemyEndY - enemyDirY * arrowHeadLen * cosf(arrowHeadAngle) + enemyDirX * arrowHeadLen * sinf(arrowHeadAngle);
                     
-                    DrawLineAA(enemyEndX, enemyEndY, headX1, headY1, COLOR_CYAN, 3.0f);
-                    DrawLineAA(enemyEndX, enemyEndY, headX2, headY2, COLOR_CYAN, 3.0f);
+                    DrawLineAA(enemyEndX, enemyEndY, headX1, headY1, COLOR_RED, 3.0f);
+                    DrawLineAA(enemyEndX, enemyEndY, headX2, headY2, COLOR_RED, 3.0f);
                 }
                 
                 // Draw aim phase instructions
