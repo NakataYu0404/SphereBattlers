@@ -181,11 +181,8 @@ void SaveBossToJSON(const Circle& player) {
         json j;
         j["hp"] = ClampHP(player.hp, player.maxHP);
         j["maxHP"] = player.maxHP;
-        j["vx"] = player.vx;
-        j["vy"] = player.vy;
-        j["angularVel"] = player.angularVel;
-        j["color"] = player.color;
-        j["radius"] = CIRCLE_RADIUS;
+        j["weaponDamage"] = player.weaponDamage;
+        j["baseSpeed"] = player.baseSpeed;
         j["weaponType"] = (int)player.weapon.type;
         j["weaponOffsetX"] = player.weapon.offsetX;
         j["weaponOffsetY"] = player.weapon.offsetY;
@@ -215,13 +212,11 @@ bool LoadBossFromJSON(Circle& boss) {
         
         // Load boss parameters with clamping and validation
         int loadedMaxHP = j.value("maxHP", MAX_HP);
-        int loadedHP = j.value("hp", MAX_HP);
+        int loadedHP = j.value("hp", loadedMaxHP);
         boss.maxHP = loadedMaxHP;
         boss.hp = ClampHP(loadedHP, loadedMaxHP);
-        boss.vx = j.value("vx", -2.0f);
-        boss.vy = j.value("vy", -3.5f);
-        boss.angularVel = j.value("angularVel", -0.025f);
-        boss.color = j.value("color", COLOR_CYAN);
+        boss.weaponDamage = j.value("weaponDamage", 0);
+        boss.baseSpeed = j.value("baseSpeed", 1.0f);
         
         // Validate weapon type enum
         int weaponTypeInt = j.value("weaponType", (int)WEAPON_SPEAR);
@@ -698,11 +693,7 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
     if (nodeType == NODE_BOSS) {
         // Try to load boss from JSON
         if (!LoadBossFromJSON(enemy)) {
-            // Default boss
-            enemy.vx = -2.0f;
-            enemy.vy = -3.5f;
-            enemy.angularVel = -0.025f;
-            enemy.color = COLOR_CYAN;
+            // Default boss (if load failed or no file)
             enemy.hp = enemy.maxHP;
             enemy.weapon.type = WEAPON_SPEAR;
             enemy.weapon.offsetX = 45.0f;
@@ -710,6 +701,11 @@ void InitializeBattle(Circle& player, Circle& enemy, const Circle& playerChar,
             enemy.weapon.length = 30.0f;
             enemy.weapon.color = COLOR_CYAN;
         }
+        // Always set these defaults for boss (not persisted in save)
+        enemy.vx = -2.0f;
+        enemy.vy = -3.5f;
+        enemy.angularVel = -0.025f;
+        enemy.color = COLOR_CYAN;
     } else {
         // Regular/elite enemy (for now, same as default)
         enemy.vx = -2.0f;
